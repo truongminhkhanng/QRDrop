@@ -1,47 +1,58 @@
-# QRDrop — kết quả build thử nghiệm
+# QRDrop — kết quả build và phát hành v0.1.0
 
-Ngày kiểm tra: 2026-10-06, Asia/Ho_Chi_Minh.
+Kiểm tra: 2026-10-06 21:21, Asia/Ho_Chi_Minh.
 
-## Cập nhật đang thực hiện lúc 19:34
+[Release v0.1.0](https://github.com/truongminhkhanng/QRDrop/releases/tag/v0.1.0) đã publish dạng bản thử nghiệm (prerelease), đủ bốn bộ cài mới. Repository giữ riêng tư; đăng nhập tài khoản có quyền truy cập để tải.
 
-Thông báo lỗi đã được chuẩn hóa cho người dùng. Source mới `27c1ad2a3c091b3ac3ee8ee97e940a6571dc5e89` đang chạy [build 37468085213](https://github.com/truongminhkhanng/QRDrop/actions/runs/37468085213) với lockfile đã commit. Bộ cài mới và Release v0.1.0 chưa được xác nhận hoàn tất tại thời điểm này. Kết quả bên dưới thuộc bản build trước, không chứng minh source mới đã đạt.
+Source ứng dụng đã kiểm thử: `f118e962e0af655e43e5f061b06cabe434ff0eec`.
+[Build và kiểm thử 37471485522](https://github.com/truongminhkhanng/QRDrop/actions/runs/37471485522): thành công trên Windows x64, macOS Apple Silicon ARM64 và Ubuntu 24.04 x64.
+[Publish 37477828846](https://github.com/truongminhkhanng/QRDrop/actions/runs/37477828846): thành công.
 
-## Kết quả build trước
+Tag `v0.1.0` trỏ đến commit phát hành `e97eaa26b92f4668572eb32d870fb2299dc89b01`. Đã so sánh Git blob: 53 tệp ứng dụng/config/lockfile/test/icon/tool giống hệt source đã kiểm thử; chỉ tài liệu và workflow publish khác. Tag commit dùng nội dung workflow hiện tại để phù hợp quyền của GITHUB_TOKEN. Không thay mã ứng dụng sau build.
 
-Source ứng dụng đã kiểm thử: `5378dc13f756edd3a0afe6b5ae0c365fd127316b`.
-[GitHub Actions run 37401346039](https://github.com/truongminhkhanng/QRDrop/actions/runs/37401346039).
-Run đã kết thúc thành công trên cả ba nền tảng. Repository `truongminhkhanng/QRDrop` giữ riêng tư. Bộ cài nằm trong draft `test-37401346039-1`, không tự publish.
+## Kiểm thử tự động
 
-## Kiểm tra tự động
-- Strict TypeScript, production build desktop/mobile, SHA-256, fixture code index và 4 mobile API regression cases: đạt trên cả ba runner.
-- HTTP receiver dùng listener/disk thật: 10 tests trên macOS/Linux, 9 trên Windows (symlink test chỉ có Unix).
-- Bao gồm approval trước ghi bytes, reject/expiry/cancel, Origin sai hoặc trùng, Accept/Reject đồng thời, chunk 8 MiB, rollback khi hash sai, replay xác minh body không append, offset sai, zero-byte, không overwrite và phục hồi dọn owned partials.
-- Desktop Cargo check và đóng gói native: xem bảng bộ cài bên dưới. Build thành công chưa chứng minh cài đặt/chạy trên thiết bị thật.
+- Strict TypeScript, production build desktop/mobile, SHA-256, code-index fixtures và bốn mobile API regressions đạt trên cả ba runner.
+- Receiver dùng HTTP/listener/disk thật: **11 tests Windows, 12 macOS, 13 Linux**, không có test thất bại.
+- Bao gồm: approval trước ghi dữ liệu; reject/expiry/cancel; Host/Origin; Accept/Reject đồng thời; chunk 8 MiB; rollback/hash/replay/offset; zero-byte; không ghi đè; phục hồi chỉ dọn tệp tạm thuộc phiên.
+- Test mới đạt: token QR được thu hồi ngay sau connect hợp lệ, gửi lại đúng yêu cầu nhận cùng phản hồi, token không tạo yêu cầu thứ hai; trường lạ/kích thước âm/traversal bị từ chối mà chưa tiêu thụ token.
+- Linux dùng socket từ 127.0.0.2 để chứng minh peer khác không lấy attempt, đọc trạng thái, gửi bằng grant bị lấy lại hoặc hủy phiên. Test này chỉ chạy trên Linux; không coi là nghiệm thu mạng hai điện thoại.
+- Desktop Cargo check và đóng gói native đạt trên cả ba OS; npm ci và Cargo --locked dùng lockfile đã commit.
 
-## Bộ cài
-Đăng nhập tài khoản có quyền truy cập repository rồi mở [draft release](https://github.com/truongminhkhanng/QRDrop/releases/tag/untagged-bd0bed7be60df7c7f10c).
+## Bộ cài và SHA-256
 
-| Nền tảng / bộ cài | Kết quả | File | Bytes | SHA-256 |
-|---|---|---|---:|---|
-| macOS ARM64 DMG | Đạt; uploaded | `QRDrop_0.1.0_aarch64.dmg` | 3991086 | `8b7dbdc7e38ff33310bed9a0915281cb5fb519cb013807603da00271c39dcf02` |
-| Linux x64 AppImage | Đạt; uploaded | `QRDrop_0.1.0_amd64.AppImage` | 80468472 | `853b96fdd9ec7644051eda5d1b35f215450a6c8359ee4cfc067adfceb8cfff96` |
-| Linux x64 deb | Đạt; uploaded | `QRDrop_0.1.0_amd64.deb` | 4943938 | `99d1b42338d3b3248d92198cfc94cf9e6d5393446c8c13aaf00fe4065f771cf7` |
-| Windows x64 NSIS | Đạt; uploaded | `QRDrop_0.1.0_x64-setup.exe` | 218079685 | `cfa1c3a8d60e78a9fd656de3bd5b6593d0c9af8870958d5ff68a83248f0824de` |
+| Bộ cài | Bytes | SHA-256 |
+|---|---:|---|
+| QRDrop_0.1.0_aarch64.dmg | 3989963 | `75da57075abe0db7cbb7455a1afad1148e8374141264ad159f858b02f3530ebb` |
+| QRDrop_0.1.0_amd64.AppImage | 80464376 | `ddd8dd107f335efb8d957c5c33a1256d6215f3061c3d9b5f40ab9a3c1d2d922b` |
+| QRDrop_0.1.0_amd64.deb | 4941382 | `28ed704a834366bf1dd61d1dbbd604ef77adb0eba3f0f48f81e47a7749d888e3` |
+| QRDrop_0.1.0_x64-setup.exe | 218085176 | `d1a9acfa4b3349372a4997f62eb317a27a685f2bdc72b3ba058d47df18f9b178` |
 
-Digest trong bảng lấy từ metadata GitHub release assets; không tải bộ cài lớn xuống VPS. So sánh SHA-256 sau khi tải về PC.
+Digest lấy từ metadata GitHub. Trước/sau publication, cả bốn asset giữ nguyên ID, tên, kích thước và digest. Không tải bộ cài lớn xuống VPS. So sánh SHA-256 sau khi tải về PC.
+
+## Bảo mật và câu chữ
+
+Token 256 bit dùng cho một yêu cầu, kiểm tra đầu vào phía máy tính, quyền gửi riêng sau phê duyệt, API ràng buộc IP đã kết nối. Chỉ mở listener trên IPv4 riêng đã chọn, cổng do OS cấp; đóng sau khi phiên kết thúc. Xem [SECURITY.md](../SECURITY.md) về retry, timeout, IP/NAT và giới hạn bảo vệ.
+
+Đã chuẩn hóa lỗi Offset/chunk/hash, đọc/ghi dữ liệu, chọn/mở thư mục, server/Worker và cài đặt thành tiếng Việt cho người dùng; không hiển thị lỗi runtime thô trong UI. Thông báo của hệ điều hành khi cài đặt nằm ngoài câu chữ của ứng dụng.
 
 ## Dependency đã khóa
-`package-lock.json` và `src-tauri/Cargo.lock` được lấy nguyên bytes từ log của job macOS thành công, không tự viết checksum. Cargo lock khớp từng byte trên cả ba runner; npm lock macOS/Linux khớp từng byte, Windows chỉ khác newline CRLF và nội dung JSON giống hệt. Rust Tauri và npm API cùng phiên bản `2.12.1`. npm TypeScript `5.9.3`, CLI `2.11.4`. Source dùng `npm ci` và Cargo `--locked`; bootstrap resolve lockfile đã bỏ. Commit ghi nhận sau run chỉ thêm lockfiles thật, tài liệu và bỏ bootstrap; source ứng dụng giữ nguyên so với commit đã build.
+
+Lockfiles lấy từ CI thành công trước đó, không tạo checksum giả. Run mới đã thực sự sử dụng và kiểm thử với các lock này; Rust Tauri và npm API 2.12.1.
 
 | File | SHA-256 |
 |---|---|
-| `package-lock.json` | `1e3666b5494b74d6d6b14d9dd174567fa51dfde50d2f5899791bb610c52808c0` |
-| `src-tauri/Cargo.lock` | `67db921d72bfd1058e2c6d6e316c8e5a573f3388fa292a8d3066ba2e15d9972c` |
+| package-lock.json | `1e3666b5494b74d6d6b14d9dd174567fa51dfde50d2f5899791bb610c52808c0` |
+| src-tauri/Cargo.lock | `67db921d72bfd1058e2c6d6e316c8e5a573f3388fa292a8d3066ba2e15d9972c` |
 
-VPS không phân giải được npm/crates: không nhận kết quả CI là build native tại VPS. TypeScript phục vụ code index được trích từ cache có sẵn rồi dọn sau cập nhật index. Source ZIP giữ cả hai lockfile và không chứa dependency/build output.
+VPS không phân giải npm/crates; native/build mới được xác minh trên GitHub runners. Local hash/mobile/index checks đạt bằng TypeScript 5.9.2 cache có sẵn đã kiểm tra SHA-512; CI dùng TypeScript 5.9.3 đã khóa. Code index cuối: 42 files/756 symbols, fresh; SQLite integrity đạt.
 
-## Cần kiểm thử trên thiết bị thật
-Cài và mở app trên PC, quét QR từ iPhone/Android, Accept và truyền file để đối chiếu SHA-256; kiểm tra >2 GiB/>10 GiB, RAM điện thoại, Wi-Fi gián đoạn, firewall, disk-full và từng filesystem. Theo [TESTING.md](TESTING.md), ghi OS/browser và kết quả, không ghi credential. Windows chưa ký publisher; macOS ký ad-hoc, chưa có Developer ID/notarization; macOS minimum 13.0 và khả năng tương thích distro Linux chưa được nghiệm thu. Không coi bản thử nghiệm này là release production đã nghiệm thu.
+## Cần nghiệm thu trên thiết bị thật
+
+Chưa chạy cài đặt/mở app và iPhone/Android LAN transfer trên thiết bị người dùng; chưa nghiệm thu truyền nhiều GB, RAM điện thoại, firewall, disk-full và các filesystem. Xem [TESTING.md](TESTING.md). HTTP không mã hóa; token/IP/port/SHA-256 không chống nghe lén hoặc MITM. TLS cần thiết kế chứng chỉ/trust riêng cho điện thoại và chưa được triển khai.
+
+Windows chưa ký publisher; macOS ký ad-hoc, chưa Developer ID/notarization. Chưa có Mac Intel; macOS minimum 13.0 và khả năng tương thích các distro Linux cần nghiệm thu. Đây là prerelease có kiểm thử tự động, chưa phải production đã nghiệm thu.
 
 ## Dọn VPS
-Đợt hoàn thiện này đã xóa dependency tooling trong `node_modules` và cache npm riêng `/tmp/qrdrop-completion-npm`: 24.068.096 allocated bytes, khoảng 22,95 MiB. Không tải bộ cài vào VPS. Giữ source, lockfiles, history/memory, SQLite code index và `artifacts/QRDrop-source.zip`; không xóa cache hay dữ liệu dự án khác. Để chạy lại tooling/build: `npm ci`, rồi `npm run build`.
+
+Đợt này đã xóa node_modules, cache npm riêng /tmp/qrdrop-final-npm và hai scratch files: **24,092,672 allocated bytes (22.977 MiB)**. Hai lần dọn trước (285.74 MiB và 22.953 MiB) là số đo riêng, không cộng lặp. Không tải installer vào VPS. Giữ source, locks, history/memory, index và artifacts/QRDrop-source.zip. Muốn chạy lại tooling/build: npm ci rồi npm run build.

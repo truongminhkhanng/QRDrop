@@ -39,3 +39,12 @@ Windows chưa có chữ ký nhà phát hành; macOS ký ad-hoc, chưa notarize. 
 
 Giao diện và thông báo lỗi của QRDrop dùng tiếng Việt. Lỗi kết nối, đọc/ghi tệp và kiểm tra dữ liệu có hướng dẫn xử lý; thông báo của hệ điều hành khi cài đặt có thể dùng ngôn ngữ hệ thống.
 
+
+## Mã kiểm tra SHA-256
+
+| Bộ cài | Bytes | SHA-256 |
+|---|---:|---|
+| QRDrop_0.1.0_aarch64.dmg | 3989963 | `75da57075abe0db7cbb7455a1afad1148e8374141264ad159f858b02f3530ebb` |
+| QRDrop_0.1.0_amd64.AppImage | 80464376 | `ddd8dd107f335efb8d957c5c33a1256d6215f3061c3d9b5f40ab9a3c1d2d922b` |
+| QRDrop_0.1.0_amd64.deb | 4941382 | `28ed704a834366bf1dd61d1dbbd604ef77adb0eba3f0f48f81e47a7749d888e3` |
+| QRDrop_0.1.0_x64-setup.exe | 218085176 | `d1a9acfa4b3349372a4997f62eb317a27a685f2bdc72b3ba058d47df18f9b178` |

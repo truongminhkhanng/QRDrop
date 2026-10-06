@@ -1,19 +1,19 @@
 # QRDrop
 
-Nhận tệp từ iPhone/Android về máy tính qua mạng nội bộ: quét QR → chọn tệp → cho phép trên máy tính → gửi → kiểm tra SHA-256.
+Nhận tệp từ iPhone/Android về máy tính qua mạng nội bộ: quét QR, chọn tệp và cho phép trên máy tính. Điện thoại dùng trình duyệt, không cần cài ứng dụng.
 
-**Trạng thái: bản thử nghiệm native.** Source, kiểm thử HTTP thật và bộ cài được xác minh qua GitHub Actions; xem kết quả theo từng nền tảng tại [`docs/BUILD_STATUS.md`](docs/BUILD_STATUS.md). Cần kiểm thử cài đặt và truyền file bằng điện thoại/PC thật trước khi nghiệm thu sử dụng.
+**Đã phát hành [v0.1.0 — Bản thử nghiệm](https://github.com/truongminhkhanng/QRDrop/releases/tag/v0.1.0).** Source, kiểm thử HTTP thật và bộ cài được xác minh qua GitHub Actions; xem kết quả theo từng nền tảng tại [`docs/BUILD_STATUS.md`](docs/BUILD_STATUS.md). Cần kiểm thử cài đặt và truyền file bằng điện thoại/PC thật trước khi nghiệm thu sử dụng.
 
 ## Các điều cần biết
 - Điện thoại không cần cài app. File phải có sẵn cục bộ nếu không có Internet.
 - HTTP trên LAN không mã hóa. Chỉ dùng mạng tin cậy.
-- Giữ browser mở và màn hình hoạt động khi gửi.
-- Giữ nguyên bytes của file browser cung cấp; không hứa lấy tài nguyên Photos gốc.
-- File được staging và kiểm tra trước khi tạo tên cuối. Không overwrite.
-- Retry trong phiên đang chạy; không resume sau reload hoặc app restart.
+- Giữ trình duyệt mở và màn hình điện thoại hoạt động khi gửi.
+- Giữ nguyên dữ liệu tệp do trình duyệt cung cấp; tệp chọn từ Photos có thể khác tài nguyên gốc.
+- Tệp được nhận vào vùng tạm và kiểm tra trước khi lưu hoàn tất. Không ghi đè tệp đã có.
+- Có thể thử gửi lại khi gián đoạn trong phiên đang chạy. Tải lại trang hoặc mở lại ứng dụng cần quét QR mới.
 
 ## Tải bộ cài qua GitHub
-Repository riêng tư: [truongminhkhanng/QRDrop](https://github.com/truongminhkhanng/QRDrop). Đăng nhập tài khoản có quyền truy cập, mở [Releases](https://github.com/truongminhkhanng/QRDrop/releases), rồi chọn draft test build đã kiểm tra trong `docs/BUILD_STATUS.md`.
+Repository riêng tư: [truongminhkhanng/QRDrop](https://github.com/truongminhkhanng/QRDrop). Đăng nhập tài khoản có quyền truy cập, mở [Release v0.1.0](https://github.com/truongminhkhanng/QRDrop/releases/tag/v0.1.0), rồi chọn bộ cài phù hợp. Mã kiểm tra SHA-256 nằm trong ghi chú phát hành.
 
 - Windows x64: NSIS setup.exe, có WebView2 offline installer.
 - macOS Apple Silicon: DMG ARM64.
@@ -24,6 +24,12 @@ Workflow chạy khi push main/master hoặc **Actions → Build QRDrop installer
 GitHub dùng cho build/phân phối, không trung chuyển file. Người dùng bộ cài không cần Node/Rust/npm.
 
 Windows installer hiện chưa ký publisher certificate. macOS build test ad-hoc signed; muốn phát hành public cần Developer ID + notarization. Không tắt bảo vệ hệ thống toàn cục để xử lý lỗi cài đặt. Linux compatibility phải kiểm thử theo distro; không hứa mọi Linux.
+
+## Bảo vệ phiên nhận
+
+Token QR chỉ tạo một yêu cầu; máy tính kiểm tra đầu vào và phải phê duyệt trước khi nhận dữ liệu. Quyền gửi giới hạn trong danh sách tệp đã duyệt, bị thu hồi khi kết thúc phiên. API chỉ chấp nhận IP của điện thoại đã kết nối; đổi IP cần tạo mã QR mới. Cổng nhận chỉ mở trên IP mạng nội bộ đã chọn và đóng sau khi kết thúc phiên.
+
+HTTP chưa mã hóa. Các kiểm tra token/IP/cổng không bảo vệ khỏi nghe lén mạng; xem [SECURITY.md](SECURITY.md) để biết giới hạn và kiểm thử.
 
 ## Chạy từ source
 Cần Node >=24, Rust stable và native prerequisites Tauri theo OS. Dependencies npm/Cargo là local trong project; các SDK/compiler/GTK/WebKit hệ thống là prerequisites desktop build, không phải global code-index service.
