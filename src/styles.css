@@ -41,6 +41,7 @@ progress::-webkit-progress-value { background: #185b3c; }
 progress::-moz-progress-bar { background: #185b3c; }
 .network-note { text-align: center; color: #69766e; font-size: 11px; margin: 20px 0 14px; }
 footer { display: flex; justify-content: center; gap: 12px; }
+.desktop-shell footer { flex-wrap: wrap; }
 .error { color: #8d2924; background: #fff0ee; border: 1px solid #ecd2ce; padding: 12px 14px; border-radius: 9px; font-size: 13px; overflow-wrap: anywhere; }
 .dialog-backdrop { position: fixed; inset: 0; background: #10211980; display: grid; place-items: center; padding: 20px; }
 .dialog { background: white; border-radius: 18px; padding: 28px; width: min(100%, 460px); max-height: 90vh; overflow: auto; box-shadow: 0 12px 60px #00170c40; }

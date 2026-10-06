@@ -35,6 +35,7 @@ pub struct Session {
     pub inner: Mutex<SessionInner>,
     pub cancel: CancellationToken,
     pub stop_server: CancellationToken,
+    pub server_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
     pub operation: Arc<Semaphore>,
     pub state_dir: PathBuf,
     pub allow_loopback: bool,
@@ -78,7 +79,7 @@ impl Manager {
         let mut current = self.current.lock().await;
         if let Some(previous) = current.as_ref() {
             if !previous.inner.lock().await.state.terminal() { return Err(AppError::conflict("Hủy phiên hiện tại trước khi tạo mã QR mới.")); }
-            previous.stop_server.cancel();
+            previous.close_server().await;
             // Wait for disk operation and cleanup before replacing the crash journal.
             let _permit = previous.operation.acquire().await.map_err(|_| AppError::conflict("Phiên đang đóng."))?;
             previous.cleanup().await?;
@@ -94,16 +95,29 @@ impl Manager {
         let session = Arc::new(Session {
             id, address, created: Instant::now(), created_unix: unix_now(), qr_svg, storage,
             inner: Mutex::new(SessionInner { state: SessionState::Waiting, join_token: token, attempt_token: None, grant: None, request_fingerprint: None, device: None, peer: None, files: Vec::new(), work: Vec::new(), approved_at: None, last_progress: Instant::now(), terminal_at: None, error: None }),
-            cancel: CancellationToken::new(), stop_server: CancellationToken::new(), operation: Arc::new(Semaphore::new(1)), state_dir: self.state_dir.clone(), allow_loopback,
+            cancel: CancellationToken::new(), stop_server: CancellationToken::new(), server_task: Mutex::new(None), operation: Arc::new(Semaphore::new(1)), state_dir: self.state_dir.clone(), allow_loopback,
             requests: Arc::new(Semaphore::new(16)), rate: Mutex::new(std::collections::HashMap::new()),
         });
-        crate::server::spawn(listener, session.clone(), self.clone());
+        crate::server::spawn(listener, session.clone(), self.clone()).await;
         *current = Some(session.clone());
         drop(current);
         Ok(session.snapshot().await)
     }
     pub async fn active(&self) -> Result<Arc<Session>> { self.current.lock().await.clone().ok_or_else(|| AppError::conflict("Chưa có phiên nhận tệp.")) }
     pub async fn cancel(&self) -> Result<()> { self.active().await?.terminate(SessionState::Cancelled, None).await; Ok(()) }
+    pub async fn stop_receiving(&self) -> Result<()> {
+        // Serialize stop/start so cleanup cannot remove a newer session's files.
+        let mut current = self.current.lock().await;
+        let Some(session) = current.as_ref().cloned() else { return Ok(()); };
+        session.terminate(SessionState::Cancelled, None).await;
+        session.close_server().await;
+        let _permit = session.operation.acquire().await.map_err(|_| AppError::conflict("Phiên đang đóng."))?;
+        // Retain the cancelled session on cleanup failure so the next start must
+        // retry cleanup before it replaces the ownership journal.
+        session.cleanup().await?;
+        *current = None;
+        Ok(())
+    }
     pub async fn decide(&self, id: &str, accept: bool) -> Result<()> {
         let session = self.active().await?;
         if session.id != id { return Err(AppError::conflict("Yêu cầu này không còn hiệu lực.")); }
@@ -142,6 +156,13 @@ impl Manager {
     }
 }
 impl Session {
+    pub async fn close_server(&self) {
+        self.stop_server.cancel();
+        if let Some(task) = self.server_task.lock().await.take() {
+            task.abort();
+            let _ = task.await;
+        }
+    }
     pub async fn snapshot(&self) -> DesktopSnapshot {
         let inner = self.inner.lock().await;
         let url = if inner.state == SessionState::Waiting { format!("http://{}/connect#t={}", self.address, inner.join_token) } else { String::new() };

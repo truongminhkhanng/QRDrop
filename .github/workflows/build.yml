@@ -5,7 +5,7 @@ on:
     tags: ['v*']
     paths-ignore:
       - '**/*.md'
-      - '.github/workflows/release-v0.1.0.yml'
+      - '.github/workflows/release-*.yml'
   pull_request:
   workflow_dispatch:
 

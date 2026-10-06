@@ -24,16 +24,17 @@ pub fn router(state: ServerState) -> Router {
         .layer(middleware::from_fn_with_state(state.clone(), guard))
         .with_state(state)
 }
-pub fn spawn(listener: tokio::net::TcpListener, session: Arc<Session>, manager: Arc<Manager>) {
+pub async fn spawn(listener: tokio::net::TcpListener, session: Arc<Session>, manager: Arc<Manager>) {
     let state = ServerState { session: session.clone(), manager };
     let app = router(state);
     let server_session = session.clone();
-    tokio::spawn(async move {
+    let task = tokio::spawn(async move {
         let listener = crate::server::limited::LimitedListener::new(listener, server_session.allow_loopback);
         if axum::serve(listener, app.into_make_service_with_connect_info::<limited::Peer>()).with_graceful_shutdown(server_session.stop_server.clone().cancelled_owned()).await.is_err() {
             server_session.terminate(SessionState::Failed, Some("Kết nối nhận tệp đã dừng. Kiểm tra mạng và tạo mã QR mới để thử lại.".to_owned())).await;
         }
     });
+    *session.server_task.lock().await = Some(task);
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(1)).await;

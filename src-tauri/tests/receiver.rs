@@ -306,3 +306,62 @@ async fn another_peer_cannot_recover_attempt_or_use_stolen_credentials() {
     assert_eq!(h.chunk(grant, id, 0, b"abc").await.status(), StatusCode::OK);
     h.stop().await;
 }
+
+#[tokio::test]
+async fn receiver_starts_disabled_and_stop_closes_waiting_listener() {
+    let root = tempfile::tempdir().expect("test directory");
+    let manager = Arc::new(Manager::new(root.path().join("state")).expect("manager"));
+    *manager.settings.lock().await = Settings { destination: root.path().join("receive") };
+    assert!(manager.current.lock().await.is_none());
+    manager.stop_receiving().await.expect("already off");
+    let first = manager.start_at("127.0.0.1:0".parse().expect("address"), true).await.expect("enable");
+    let old = manager.active().await.expect("active");
+    let old_token = old.inner.lock().await.join_token.clone();
+    let idle = tokio::net::TcpStream::connect(old.address).await.expect("open socket");
+    tokio::time::timeout(Duration::from_secs(2), manager.stop_receiving()).await.expect("stop timeout").expect("stop waiting");
+    assert!(manager.current.lock().await.is_none());
+    assert!(old.inner.lock().await.join_token.is_empty());
+    assert!(tokio::net::TcpStream::connect(old.address).await.is_err());
+    drop(idle);
+    manager.stop_receiving().await.expect("stop twice");
+    let second = manager.start_at("127.0.0.1:0".parse().expect("address"), true).await.expect("enable again");
+    assert_ne!(first.session_id, second.session_id);
+    let fresh = manager.active().await.expect("new active");
+    assert_ne!(old_token, fresh.inner.lock().await.join_token);
+    let base = format!("http://{}", fresh.address);
+    let reused = Client::new().post(format!("{base}/api/connect")).header("Origin", &base).json(&json!({"token": old_token,"request_id": uuid::Uuid::new_v4().to_string(),"device": "test browser","files": [{"name": "old.txt","size": 1}]})).send().await.expect("old QR request");
+    assert_eq!(reused.status(), StatusCode::FORBIDDEN);
+    assert_eq!(fresh.inner.lock().await.state, SessionState::Waiting);
+    manager.stop_receiving().await.expect("final stop");
+}
+
+#[tokio::test]
+async fn stop_receiving_preserves_completed_files_and_cleans_incomplete_data() {
+    let h = Harness::new().await;
+    let connection = h.request_transfer(&[("done.txt", 3), ("incomplete.txt", 6)]).await;
+    let attempt = connection["attempt_token"].as_str().expect("attempt");
+    let state = h.accept(attempt).await;
+    let grant = state["grant"].as_str().expect("grant");
+    let first = state["files"][0]["id"].as_str().expect("first id");
+    let second = state["files"][1]["id"].as_str().expect("second id");
+    assert_eq!(h.chunk(grant, first, 0, b"abc").await.status(), StatusCode::OK);
+    h.finish(grant, attempt, first, b"abc").await;
+    assert_eq!(h.chunk(grant, second, 0, b"def").await.status(), StatusCode::OK);
+    let session = h.manager.active().await.expect("session");
+    let staging = h.destination.join(".qrdrop-partials").join(&session.id);
+    assert!(staging.join(format!("{second}.part")).exists());
+    std::fs::write(h.destination.join("unrelated.part"), b"keep").expect("unrelated file");
+    h.manager.stop_receiving().await.expect("turn off");
+    assert!(h.manager.current.lock().await.is_none());
+    assert_eq!(session.inner.lock().await.state, SessionState::PartiallyCompleted);
+    assert!(session.inner.lock().await.grant.is_none());
+    assert!(tokio::net::TcpStream::connect(session.address).await.is_err());
+    assert_eq!(std::fs::read(h.destination.join("done.txt")).expect("completed file"), b"abc");
+    assert_eq!(std::fs::read(h.destination.join("unrelated.part")).expect("unrelated file"), b"keep");
+    assert!(!h.destination.join("incomplete.txt").exists());
+    assert!(!staging.exists());
+    assert_eq!(h.manager.recent.lock().await.len(), 1);
+    let next = h.manager.start_at("127.0.0.1:0".parse().expect("address"), true).await.expect("new QR");
+    assert_ne!(next.session_id, session.id);
+    h.manager.stop_receiving().await.expect("stop next");
+}

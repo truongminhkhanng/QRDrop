@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "QRDrop", "version": "0.1.0", "identifier": "app.qrdrop.desktop",
+  "productName": "QRDrop", "version": "1.0.0", "identifier": "app.qrdrop.desktop",
   "build": { "beforeDevCommand": "npm run build", "beforeBuildCommand": "npm run build", "frontendDist": "../dist" },
   "app": {
     "windows": [{ "label": "main", "title": "QRDrop", "width": 820, "height": 780, "minWidth": 600, "minHeight": 640 }],

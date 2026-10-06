@@ -15,6 +15,8 @@ async fn session_snapshot(manager: State<'_, Managed>) -> Result<Option<DesktopS
 #[tauri::command]
 async fn cancel_session(manager: State<'_, Managed>) -> Result<(), String> { manager.cancel().await.map_err(|e| e.to_string()) }
 #[tauri::command]
+async fn stop_receiving(manager: State<'_, Managed>) -> Result<(), String> { manager.stop_receiving().await.map_err(|e| e.to_string()) }
+#[tauri::command]
 async fn decide_transfer(manager: State<'_, Managed>, session_id: String, accept: bool) -> Result<(), String> { manager.decide(&session_id, accept).await.map_err(|e| e.to_string()) }
 #[tauri::command]
 fn network_interfaces() -> Result<Vec<NetworkInterface>, String> { network::interfaces().map_err(|e| e.to_string()) }
@@ -58,20 +60,14 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![create_session, session_snapshot, cancel_session, decide_transfer, network_interfaces, get_settings, set_destination, recent_transfers, choose_destination, open_destination])
+        .invoke_handler(tauri::generate_handler![create_session, session_snapshot, cancel_session, stop_receiving, decide_transfer, network_interfaces, get_settings, set_destination, recent_transfers, choose_destination, open_destination])
         .build(tauri::generate_context!());
     match result {
         Ok(app) => app.run(|handle, event| {
             if let tauri::RunEvent::Exit = event {
                 let manager = handle.state::<Managed>().inner().clone();
                 tauri::async_runtime::block_on(async {
-                    if let Ok(session) = manager.active().await {
-                        session.terminate(crate::session::SessionState::Cancelled, None).await;
-                        session.stop_server.cancel();
-                        if let Ok(_permit) = session.operation.acquire().await {
-                            if let Err(error) = session.cleanup().await { eprintln!("Partial cleanup failed: {error}"); }
-                        }
-                    }
+                    if let Err(error) = manager.stop_receiving().await { eprintln!("Receiver cleanup failed: {error}"); }
                 });
             }
         }),
