@@ -173,6 +173,12 @@ async fn large_chunks_roll_back_bad_digest_and_reject_wrong_offsets() {
     assert_eq!(std::fs::metadata(part).expect("staging file").len(),0);
     assert_eq!(h.chunk(grant,id,0,first).await.status(),StatusCode::OK);
     assert_eq!(h.chunk(grant,id,0,first).await.status(),StatusCode::OK);
+    let forged=h.request(Method::PUT,&format!("/api/files/{id}/chunks")).bearer_auth(grant)
+        .header("content-type","application/octet-stream").header("x-qrdrop-offset",0)
+        .header("x-qrdrop-length",first.len()).header("x-qrdrop-sha256",hex::encode(Sha256::digest(first)))
+        .body(vec![0xa4;first.len()]).send().await.expect("forged replay");
+    assert_eq!(forged.status(),StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(h.status(attempt).await["files"][0]["received"],first.len() as u64);
     assert_eq!(h.chunk(grant,id,1,b"x").await.status(),StatusCode::CONFLICT);
     assert!(!h.destination.join("large.bin").exists());
     assert_eq!(h.chunk(grant,id,first.len() as u64,&data[first.len()..]).await.status(),StatusCode::OK);

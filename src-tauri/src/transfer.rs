@@ -33,7 +33,12 @@ pub async fn chunk(session: Arc<Session>, grant: &str, id: &str, start: u64, len
     let work = file_work(&session, id, false).await?;
     let mut work = work.lock().await;
     if let Some((previous_start, previous_length, previous_digest)) = &work.last_chunk {
-        if start == *previous_start && length == *previous_length && digest.eq_ignore_ascii_case(previous_digest) { return Ok(work.offset); }
+        if start == *previous_start && length == *previous_length && digest.eq_ignore_ascii_case(previous_digest) {
+            // Consume the bounded retry body before replying so HTTP clients do not
+            // lose the ACK to a connection reset while they are still transmitting.
+            verify_replay(&session, &mut body, length, digest).await?;
+            return Ok(work.offset);
+        }
     }
     if start != work.offset || start.checked_add(length).is_none_or(|end| end > work.size) { return Err(AppError::conflict(format!("Offset hợp lệ: {}", work.offset))); }
     if work.file.is_none() { work.file = Some(files::open_part(&session.storage, &work.id)?); }
@@ -84,6 +89,26 @@ pub async fn chunk(session: Arc<Session>, grant: &str, id: &str, start: u64, len
     work.offset = start + length;
     work.last_chunk = Some((start, length, digest.to_ascii_lowercase()));
     Ok(work.offset)
+}
+async fn verify_replay(session: &Session, body: &mut Body, length: u64, expected: &str) -> Result<()> {
+    let mut hash = Sha256::new();
+    let mut received = 0u64;
+    loop {
+        let frame = tokio::select! {
+            _ = session.cancel.cancelled() => return Err(AppError::denied()),
+            value = tokio::time::timeout(Duration::from_secs(90), body.frame()) => value.map_err(|_| AppError::new(StatusCode::REQUEST_TIMEOUT, "chunk_timeout", "Kết nối bị gián đoạn. Hãy thử lại."))?,
+        };
+        let Some(frame) = frame else { break; };
+        let frame = frame.map_err(|_| AppError::invalid("Phần dữ liệu gửi lại bị gián đoạn."))?;
+        if let Ok(data) = frame.into_data() {
+            if received.saturating_add(data.len() as u64) > length { return Err(AppError::new(StatusCode::PAYLOAD_TOO_LARGE, "chunk_too_large", "Phần dữ liệu gửi lại vượt kích thước đã khai báo.")); }
+            hash.update(&data);
+            received += data.len() as u64;
+        }
+    }
+    if received != length { return Err(AppError::invalid("Phần dữ liệu gửi lại chưa đầy đủ.")); }
+    if !hex::encode(hash.finalize()).eq_ignore_ascii_case(expected) { return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "hash_mismatch", "Dữ liệu gửi lại không khớp.")); }
+    Ok(())
 }
 pub async fn start_verification(session: Arc<Session>, manager: Arc<Manager>, grant: &str, id: &str, expected: String) -> Result<()> {
     authorize(&session, grant).await?;
