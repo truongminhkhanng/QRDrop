@@ -10,7 +10,7 @@ Kết quả stress: SHA-256 khớp trên 4.303.355.907 bytes, khoảng 135 giây
 Dependency/cache tạm và output build trên VPS được dọn sau kiểm thử theo yêu cầu người dùng. Khi kiểm thử tiếp từ source: chạy `npm ci`, rồi `npm run build` trước Cargo để tạo lại mobile assets.
 
 ## Luồng cơ bản
-1. Cài bộ cài trong private draft release Windows/macOS/Linux sau khi CI build thành công. Dùng thư mục test riêng có đủ dung lượng.
+1. Cài bộ cài trong Release v0.1.0 Windows/macOS/Linux sau khi CI build thành công. Dùng thư mục test riêng có đủ dung lượng.
 2. Cho phép QRDrop truy cập LAN/firewall khi OS hỏi. Cùng mạng có thể bị guest/client isolation; tắt VPN hoặc chọn interface thực tế nếu địa chỉ sai.
 3. Quét QR bằng camera → browser mở → chọn file → yêu cầu gửi.
 4. **Chưa Accept:** không có file bytes được ghi. Từ chối: không được gửi, phải tạo QR mới.
@@ -32,6 +32,9 @@ File zero-byte; arbitrary extension; HEIC/DNG/MOV/ZIP từ Files; tên Unicode; 
 - Tạo file cùng tên ngay lúc finalize: file cũ không đổi bytes.
 - Kill desktop giữa transfer, mở lại: owned partials được dọn; `.part` không thuộc QRDrop được giữ.
 - QR hết hạn trước Accept và grant không hoạt động: không ghi file.
+- Mã QR đã dùng không tạo thêm yêu cầu hoặc thay danh sách tệp. Gửi lại đúng yêu cầu từ cùng điện thoại nhận cùng phiên, không tạo phiên khác.
+- Thiết bị có IP khác không lấy được trạng thái, gửi dữ liệu hay hủy phiên, kể cả khi dùng lại token phiên. Đổi IP điện thoại giữa phiên: cần tạo QR mới.
+- HTTP vẫn không mã hóa; không diễn giải IP, port ngẫu nhiên hoặc SHA-256 thành khả năng chống nghe lén/MITM.
 - Shared symlink/reparse path không thoát destination; unknown staging content không bị xóa mù.
 
 ## Backend automation

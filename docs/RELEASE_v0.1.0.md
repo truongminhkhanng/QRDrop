@@ -25,9 +25,15 @@ Windows: mở file `.exe` để cài. Mac: mở `.dmg` và kéo QRDrop vào Appl
 
 QRDrop kiểm tra dữ liệu trước khi hoàn tất và không ghi đè tệp đã có. Dữ liệu không đi qua máy chủ đám mây. Kết nối HTTP không mã hóa; chỉ dùng trên mạng bạn tin cậy. Tệp từ Photos có thể khác tài nguyên gốc do trình duyệt cung cấp.
 
+## Bảo vệ phiên nhận tệp
+
+Mã QR dùng cho một yêu cầu nhận tệp và hết hiệu lực ngay khi yêu cầu hợp lệ được tiếp nhận. Máy tính vẫn phải cho phép trước khi điện thoại gửi dữ liệu. Quyền gửi chỉ dùng cho danh sách tệp đã duyệt; kết thúc hoặc hủy phiên sẽ thu hồi quyền đó.
+
+QRDrop kiểm tra đầu vào tại máy tính và chỉ nhận yêu cầu trong phiên từ địa chỉ IP của điện thoại đã kết nối. Nếu điện thoại đổi địa chỉ IP, hãy tạo mã QR mới. Cổng nhận tệp chỉ mở trên kết nối mạng nội bộ đã chọn và đóng sau khi phiên kết thúc. Các kiểm tra này không mã hóa kết nối HTTP và không chống được nghe lén mạng.
+
 ## Trạng thái bản thử nghiệm
 
-Bộ cài đã build thành công và vượt qua kiểm thử tự động trên Windows x64, macOS ARM64 và Ubuntu 24.04 x64 trong [run 37468085213](https://github.com/truongminhkhanng/QRDrop/actions/runs/37468085213). Chưa nghiệm thu cài đặt và truyền tệp bằng PC/điện thoại thật, tệp nhiều GB hay khả năng tương thích mọi bản Linux.
+Bộ cài đã build thành công và vượt qua kiểm thử tự động trên Windows x64, macOS ARM64 và Ubuntu 24.04 x64 trong [run 37471485522](https://github.com/truongminhkhanng/QRDrop/actions/runs/37471485522). Chưa nghiệm thu cài đặt và truyền tệp bằng PC/điện thoại thật, tệp nhiều GB hay khả năng tương thích mọi bản Linux.
 
 Windows chưa có chữ ký nhà phát hành; macOS ký ad-hoc, chưa notarize. Hệ điều hành có thể hiện cảnh báo khi mở. Không tắt bảo vệ hệ thống toàn cục. Cấu hình macOS tối thiểu là 13.0, cần kiểm tra trên thiết bị thật.
 

@@ -12,9 +12,9 @@ concurrency:
 jobs:
   publish:
     if: >-
-      false && github.repository == 'truongminhkhanng/QRDrop' &&
-      github.event.workflow_run.id == 37468085213 &&
-      github.event.workflow_run.head_sha == '27c1ad2a3c091b3ac3ee8ee97e940a6571dc5e89' &&
+      github.repository == 'truongminhkhanng/QRDrop' &&
+      github.event.workflow_run.id == 37471485522 &&
+      github.event.workflow_run.head_sha == 'f118e962e0af655e43e5f061b06cabe434ff0eec' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.conclusion == 'success'
@@ -28,8 +28,8 @@ jobs:
         with:
           script: |
             const repo = context.repo;
-            const SOURCE = '27c1ad2a3c091b3ac3ee8ee97e940a6571dc5e89';
-            const RUN_ID = 37468085213;
+            const SOURCE = 'f118e962e0af655e43e5f061b06cabe434ff0eec';
+            const RUN_ID = 37471485522;
             const check = (ok, message) => { if (!ok) throw new Error(message); };
             const { data: metadata } = await github.rest.repos.get(repo);
             check(metadata.private, 'Repository must remain private');

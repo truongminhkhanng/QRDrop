@@ -26,7 +26,7 @@ Chỉ giữ nguyên khi user nói rõ “giữ nguyên câu này”, “để đ
 
 ## QRDrop invariants
 - Explicit desktop approval for an immutable manifest before any file bytes are written.
-- QR join token is not upload permission; never log credentials or put them into memory/history/index.
+- QR join token creates one immutable request and is consumed at valid connect; identical retries from the selected peer recover the same reply. API credentials remain necessary; peer IP is an extra restriction, never identity proof. Never log credentials or put them into memory/history/index.
 - Opaque bytes; no conversion/recompression. Only guarantee the browser-supplied file object, not original Photos resources.
 - HTTP LAN is unencrypted. No claims of protection against LAN interception/MITM.
 - Private selected IPv4 only; no UPnP, relay, cloud transfer or public binding.
