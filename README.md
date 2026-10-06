@@ -1,73 +1,63 @@
 # QRDrop
 
-Nhận tệp từ iPhone/Android về máy tính qua mạng nội bộ: quét QR, chọn tệp và cho phép trên máy tính. Điện thoại dùng trình duyệt, không cần cài ứng dụng.
+**English** · [Tiếng Việt](README.vi.md)
 
-**Đã phát hành [v0.1.0 — Bản thử nghiệm](https://github.com/truongminhkhanng/QRDrop/releases/tag/v0.1.0).** Source, kiểm thử HTTP thật và bộ cài được xác minh qua GitHub Actions; xem kết quả theo từng nền tảng tại [`docs/BUILD_STATUS.md`](docs/BUILD_STATUS.md). Cần kiểm thử cài đặt và truyền file bằng điện thoại/PC thật trước khi nghiệm thu sử dụng.
+Send files from your phone to your computer by scanning a QR code. Your phone uses a web browser; no mobile app is required.
 
-## Các điều cần biết
-- Điện thoại không cần cài app. File phải có sẵn cục bộ nếu không có Internet.
-- HTTP trên LAN không mã hóa. Chỉ dùng mạng tin cậy.
-- Giữ trình duyệt mở và màn hình điện thoại hoạt động khi gửi.
-- Giữ nguyên dữ liệu tệp do trình duyệt cung cấp; tệp chọn từ Photos có thể khác tài nguyên gốc.
-- Tệp được nhận vào vùng tạm và kiểm tra trước khi lưu hoàn tất. Không ghi đè tệp đã có.
-- Có thể thử gửi lại khi gián đoạn trong phiên đang chạy. Tải lại trang hoặc mở lại ứng dụng cần quét QR mới.
+[Download QRDrop 1.0.0](https://github.com/truongminhkhanng/QRDrop/releases/tag/v1.0.0)
 
-## Tải bộ cài qua GitHub
-Repository riêng tư: [truongminhkhanng/QRDrop](https://github.com/truongminhkhanng/QRDrop). Đăng nhập tài khoản có quyền truy cập, mở [Release v0.1.0](https://github.com/truongminhkhanng/QRDrop/releases/tag/v0.1.0), rồi chọn bộ cài phù hợp. Mã kiểm tra SHA-256 nằm trong ghi chú phát hành.
+## Install
 
-- Windows x64: NSIS setup.exe, có WebView2 offline installer.
-- macOS Apple Silicon: DMG ARM64.
-- Linux x64: AppImage/deb, build trên Ubuntu 24.04.
+Choose the installer for your computer:
 
-Workflow chạy khi push main/master hoặc **Actions → Build QRDrop installers → Run workflow**. Build trong repository riêng tư lưu bộ cài ở draft release theo từng run; không tự publish. Actions artifacts chỉ dùng cho PR hoặc repository công khai. `package-lock.json` và `src-tauri/Cargo.lock` đã khóa dependency từ run CI thực tế; dùng `npm ci` và Cargo `--locked`, không sửa checksum bằng tay.
+| Computer | Installer | Installation |
+|---|---|---|
+| Windows 64-bit | `QRDrop_1.0.0_x64-setup.exe` | Open the installer and follow the steps |
+| Apple Silicon Mac | `QRDrop_1.0.0_aarch64.dmg` | Open the disk image and drag QRDrop into Applications |
+| Ubuntu/Debian 64-bit | `QRDrop_1.0.0_amd64.deb` | Open with your software manager |
+| Linux 64-bit | `QRDrop_1.0.0_amd64.AppImage` | Allow the file to run as a program, then open it |
 
-GitHub dùng cho build/phân phối, không trung chuyển file. Người dùng bộ cài không cần Node/Rust/npm.
+**No Node.js, npm or Rust installation is needed.** The Mac installer is for Apple Silicon; Intel Macs are not supported. The configured minimum macOS version is 13.0.
 
-Windows installer hiện chưa ký publisher certificate. macOS build test ad-hoc signed; muốn phát hành public cần Developer ID + notarization. Không tắt bảo vệ hệ thống toàn cục để xử lý lỗi cài đặt. Linux compatibility phải kiểm thử theo distro; không hứa mọi Linux.
+The download page currently requires a GitHub account with repository access. If the page is unavailable, sign in with an account that has access.
 
-## Bảo vệ phiên nhận
+Windows installers do not yet have a publisher signature. macOS builds are ad-hoc signed and are not notarized, so your operating system may show a warning. Installation and phone transfers still need verification on real devices. The app interface currently uses Vietnamese; the button labels below match the app.
 
-Token QR chỉ tạo một yêu cầu; máy tính kiểm tra đầu vào và phải phê duyệt trước khi nhận dữ liệu. Quyền gửi giới hạn trong danh sách tệp đã duyệt, bị thu hồi khi kết thúc phiên. API chỉ chấp nhận IP của điện thoại đã kết nối; đổi IP cần tạo mã QR mới. Cổng nhận chỉ mở trên IP mạng nội bộ đã chọn và đóng sau khi kết thúc phiên.
+## Send your first files
 
-HTTP chưa mã hóa. Các kiểm tra token/IP/cổng không bảo vệ khỏi nghe lén mạng; xem [SECURITY.md](SECURITY.md) để biết giới hạn và kiểm thử.
+1. Connect your phone and computer to the same Wi-Fi or local network where they can reach each other.
+2. Open QRDrop on your computer. Choose a save folder in **Cài đặt** (Settings).
+3. Select **Bật nhận tệp** (Enable receiving), then scan the QR code with your phone camera.
+4. Choose files on your phone and select **Yêu cầu gửi tệp** (Request to send).
+5. Review the file list on your computer and select **Cho phép** (Allow).
+6. Keep the phone page open and its screen awake until the transfer finishes. Select **Mở thư mục** (Open folder) on your computer to find your files.
 
-## Chạy từ source
-Cần Node >=24, Rust stable và native prerequisites Tauri theo OS. Dependencies npm/Cargo là local trong project; các SDK/compiler/GTK/WebKit hệ thống là prerequisites desktop build, không phải global code-index service.
+QRDrop checks the data before saving a completed file. Existing files are never overwritten; a new file with the same name gets a different name.
 
-```bash
-npm ci
-npm run build
-npm run tauri -- dev
-```
+## Control receiving
 
-Dev mở desktop assets đã build để mobile/server cùng có assets offline. Sau thay đổi UI, build lại. Không dùng Vite page một mình để giả lập quyền nhận file desktop.
+| Control | What it does |
+|---|---|
+| **Bật nhận tệp** — Enable receiving | Creates a QR code and opens the receiving connection |
+| **Tắt nhận tệp** — Disable receiving | Closes the connection, cancels unfinished files and keeps completed files |
+| **Làm mới QR** — Refresh QR | Replaces the current QR code and invalidates the old one |
 
-Build trực tiếp trên native host:
+Receiving starts **off** when you open QRDrop. After a transfer ends, enable receiving again for the next transfer. Refreshing a code during a pending request or transfer asks for confirmation first.
 
-```bash
-# Windows
-npm run tauri -- build --bundles nsis -- --locked
-# macOS Apple Silicon
-npm run tauri -- build --target aarch64-apple-darwin --bundles dmg -- --locked
-# Linux
-npm run tauri -- build --bundles appimage,deb -- --locked
-```
+Closing QRDrop completely stops receiving. Minimizing the window keeps the app running.
 
-## Kiểm tra
-```bash
-npm run build
-npm run test:hash
-npm run test:codeintel
-npm run test:mobile
-cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features
-cargo check --locked --manifest-path src-tauri/Cargo.toml
-```
+## Connection help
 
-Build mobile assets trước Cargo: Axum embed `mobile-dist` bằng `include_dir`. Các test Rust dùng listener/disk thật và Manager approval; không có auto-approve trong sản phẩm. Đọc `docs/TESTING.md` để kiểm thử trên PC/phone.
+- Check that both devices can reach each other. Guest Wi-Fi, device isolation and VPNs can block the connection.
+- Allow QRDrop to access your local network when your operating system asks. In Settings, choose the correct network connection and create a new QR code.
+- If a code has expired, has already been used, or your phone changes networks, create a new code and scan it again.
+- If a transfer is interrupted, keep the phone page open to retry. Reloading the page or reopening QRDrop requires a new QR code.
+- If a file cannot be saved, check free disk space and folder permissions, or choose another folder.
 
-Kiểm tra SHA-256 riêng với dữ liệu trên 4 GiB: `npm run test:hash:large` (buffer 8 MiB tái sử dụng, không tạo file lớn). Đây là stress test thuật toán trên Node, không phải nghiệm thu truyền file điện thoại. Sau đợt kiểm thử VPS, dependency/cache và output build tạm được dọn; source và ZIP vẫn được giữ. Chạy lại `npm ci` và `npm run build` trước khi build/test tiếp.
+## Privacy
 
-## Kiến trúc và agent
-`docs/MVP.md`: contract, protocol/limits, failure semantics. `src-tauri/src`: Rust modules. `src/desktop` và `src/mobile`: UI riêng. `tools/codeintel/README.md`: local index và giới hạn parser.
+Files travel directly from your phone to your computer, without a cloud relay. Your computer must approve the file list before any file data is received.
 
-Session sau chỉ cần: `@AGENT.md [task]`. Agent phải đọc MEMORY, load context chọn lọc, query graph khi phù hợp, xác minh source, sửa tối thiểu và cập nhật history/memory.
+**The HTTP connection is not encrypted. Use QRDrop only on a network you trust.** A QR code and transfer permission do not replace network encryption. See the [security details](SECURITY.md).
+
+QRDrop preserves the file data supplied by the browser. Photos and videos chosen from a phone's photo library may differ from the original library resources.

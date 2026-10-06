@@ -42,3 +42,6 @@ Original Photos, Live Photo structure, full folder trees, multi-sender/parallel 
 
 ## Distribution and unconfirmed items
 CI native Windows x64 setup.exe; macOS ARM64 dmg; Linux x64 AppImage/deb. This does not prove runtime compatibility. App identifier `app.qrdrop.desktop`, minimum macOS 13.0, business KPI, pricing, signing credentials, tested OS/browser versions are provisional/[CHƯA XÁC NHẬN]. GitHub artifacts are test builds until real device acceptance is complete.
+
+## Desktop receive controls (1.0.0)
+Receiving starts disabled. Enable opens a new private-interface listener and QR. Disable terminates the active session, closes/joins the serving task, waits for disk rollback and cleans owned staging before releasing the session. Completed files remain. QR refresh performs disable then enable; a pending request/transfer needs user confirmation. Start/stop serialize on Manager.current so old cleanup cannot touch a new session journal. Late desktop events from an old session are ignored.

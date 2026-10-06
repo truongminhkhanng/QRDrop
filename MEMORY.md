@@ -1,22 +1,22 @@
 # Working memory
 
 ## Last updated
-2026-10-06 21:21, Asia/Ho_Chi_Minh. Authorized remaining software work completed: Vietnamese error wording, token/peer hardening, source/locks/docs pushed, new three-platform native build successful, v0.1.0 prerelease published and verified. Final release/security records and source archive validated (72 maintained files, CRC/inclusion checks passed); documentation-only upload preserves published application/tag.
+2026-10-06 22:00, Asia/Ho_Chi_Minh. QRDrop 1.0.0 receiver controls implemented; native build and stable publication in progress. User wants actual new release/tag, product wording, bilingual English/Vietnamese README and release notes, About metadata, public visibility after completion, and saved context.
 
-## Current state
-Private repo: https://github.com/truongminhkhanng/QRDrop. Download: https://github.com/truongminhkhanng/QRDrop/releases/tag/v0.1.0. Release ID 404759440; draft=false, prerelease=true, four uploaded installers with SHA-256. Published source application f118e962e0af655e43e5f061b06cabe434ff0eec passed run 37471485522. Tag points to recording/publisher commit e97eaa26b92f4668572eb32d870fb2299dc89b01; 53 protected Git blobs independently verified identical to tested source. Publish run 37477828846 SUCCESS. Repository remains private. Previous drafts retained as historical builds.
+## Current source/build
+Repo: https://github.com/truongminhkhanng/QRDrop (currently private). Tested candidate source 523b49acfec366390313bfedfda42992f05a5c01; exact native run 37482136952. New publisher .github/workflows/release-v1.0.0.yml checks source/run, three successful jobs, protected tree equality, actual downloaded installer bytes/SHA256, creates a separate stable release and publishes latest. Old v0.1.0/tag/installers retained. Publisher early push 37482552967 succeeded by waiting for the build; this does not prove publication.
 
-## Verification
-All runners passed strict frontend production builds, hash/index/mobile regressions, real receiver suite, desktop check and native packaging with npm ci and Cargo --locked. Receiver 11 Windows / 12 macOS / 13 Linux tests. Token consumption/retry, malformed input and Linux different-source-IP denial passed. Assets unchanged across publication. See docs/BUILD_STATUS.md for sizes/digests. Tauri Rust/npm API 2.12.1; genuine npm/Cargo locks preserved.
+## Receive behavior
+App starts off. Bật nhận tệp enables a new session; Tắt nhận tệp revokes credentials, aborts/joins listener, serializes disk cleanup, keeps completed files. Làm mới QR stops old session then creates fresh session/token; pending requests/transfers ask confirmation. Desktop ignores late old-session events. Headless integration tests cover stop with an idle socket, immediate port closure, re-enable and old token denial, preserving completed/unrelated files and cleaning owned incomplete staging.
 
-## Security / product
-Join token consumed at first valid connect; immutable approved manifest. Identical retries recover original reply only from selected peer; API guard and locked connect check prevent another peer's access/race. Attempt/upload credentials remain required; IP is extra restriction, not identity. Private selected IPv4 with OS-assigned port, bounded requests/chunks, no overwrite. HTTP remains unencrypted; TLS/trust not implemented. UI errors now use Vietnamese product wording instead of Offset/chunk/hash/raw runtime details; includes storage/folder/Worker/settings messages. Worker startup is inside send try/finally.
+## Language and publication preferences
+README.md is English user documentation, README.vi.md Vietnamese with language links; no agent/build/internal brief in README. Release notes are bilingual. App remains Vietnamese; no application language switch was explicitly requested. User superseded earlier private-only preference and authorized Public after completion. User will change visibility to Public manually after preparation. Tools expose source/releases but not repository visibility/About mutation. Local gh has no usable connection (authentication/network checks fail). Do not claim these settings changed. Concrete About fields prepared in .github/PROJECT_ABOUT.md.
 
-## Resources / recording
-VPS npm ci fails EAI_AGAIN; local native build lacks Axum. New build evidence is GitHub-native. Local hash/mobile/index checks passed using verified cached TS5.9.2 only for tooling; CI locked TS5.9.3. Index refreshed: 42 files/756 symbols; SQLite integrity ok. Removed node_modules, /tmp/qrdrop-final-npm and owned scratch files: 24092672 bytes (22.977 MiB). No installer downloaded to VPS. Keep source, locks, history, index and source ZIP. Restore npm ci/build before tooling/Cargo next time. No usable local .git; use GitHub tools with expected-head lease.
+## Verification/resources
+Local SHA256 regression passed. npm ci fails EAI_AGAIN; TypeScript cache and Rust Axum unavailable. Source reviewed with targeted rg fallback. Native CI uses genuine locked dependencies. Publisher refreshes code index and exports derived SQLite/state through logs for local restore. Do not download installers to VPS. Preserve source/locks/history/index and source ZIP; clean owned dependencies/temp files after work. No usable local .git; GitHub writes use expected-head lease.
 
-## Acceptance boundary
-Real user PC installation/iPhone/Android LAN transfer remain pending, as do multi-GB phone transport/RAM, firewall/disk-full/filesystems. Windows unsigned, macOS ad-hoc (no notarization), no Mac Intel installer; macOS 13.0 minimum/Linux distro compatibility require device checks. Do not call the prerelease production accepted. SECURITY.md covers HTTP/IP/NAT/port limits. Publication permission preserves private repo visibility.
+## Security/acceptance
+One-request 256-bit QR credential, immutable approved manifest, separate upload grant, selected peer plus credential, private IPv4/ephemeral port, bounded chunks, SHA256/no overwrite. HTTP unencrypted; IP/port/hash do not prevent interception/MITM. Real PC/iPhone/Android installation/transfers, multi-GB phone transfer, firewall/disk/filesystem acceptance remain pending. Windows unsigned; Mac Apple Silicon only/ad-hoc/no notarization, configured minimum 13.0. Installer users need no Node/npm/Rust.
 
-## Publisher behavior
-.github/workflows/release-v0.1.0.yml is pinned to tested source/run. It verifies private repo, three successful jobs, four asset digests, protected tree equality and main head before tagging recording commit. GITHUB_TOKEN cannot tag older commits with different workflow files; use verified recording head. Do not move published version tag or silently replace installers in future work.
+## Remaining
+Await native build, verify stable release/tag/four asset digests. Record actual results and any public/About capability block. Restore fresh index, update final docs/memory/history/long-term, source ZIP and cleanup; push and verify maintained files. Do not move published tags or replace published installers.

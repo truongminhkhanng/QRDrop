@@ -25,6 +25,7 @@ Phải hiểu mục đích rồi viết thành ngôn ngữ sản phẩm phù h�
 Chỉ giữ nguyên khi user nói rõ “giữ nguyên câu này”, “để đúng nội dung này”, “copy nguyên văn”, hoặc đó rõ ràng là dữ liệu cần hiển thị. Số liệu/câu chữ minh họa không tự trở thành UI. Khi không chắc, coi là chỉ dẫn nội bộ. Quy tắc này không ngăn history lưu brief làm bằng chứng; history không được dùng làm UI copy.
 
 ## QRDrop invariants
+- Receiving starts off. Only an explicit desktop action creates a listener; disabling receiving closes it and cleans owned incomplete data while keeping completed files. Refresh creates a new session/QR and revokes the previous session.
 - Explicit desktop approval for an immutable manifest before any file bytes are written.
 - QR join token creates one immutable request and is consumed at valid connect; identical retries from the selected peer recover the same reply. API credentials remain necessary; peer IP is an extra restriction, never identity proof. Never log credentials or put them into memory/history/index.
 - Opaque bytes; no conversion/recompression. Only guarantee the browser-supplied file object, not original Photos resources.

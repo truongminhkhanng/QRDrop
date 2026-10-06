@@ -12,7 +12,8 @@ QRDrop nhận tệp trên mạng nội bộ tin cậy. Kết nối HTTP hiện k
 - API chỉ chấp nhận IP đã kết nối, đồng thời vẫn yêu cầu đúng credential và trạng thái phiên. IP không chứng minh danh tính: nhiều thiết bị có thể dùng chung IP qua NAT/proxy; thiết bị đổi IP cần tạo phiên mới.
 - Máy chủ kiểm tra schema, từ chối trường lạ, kiểm tra tên/dung lượng/số lượng tệp, giới hạn nội dung yêu cầu trước khi đọc JSON, và không nhận đường dẫn do điện thoại chỉ định. Xem [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html).
 - Kiểm tra Host/Origin/Sec-Fetch-Site, giới hạn số kết nối/yêu cầu và tần suất kết nối, thời gian chờ và tiến triển; không có API LAN để phê duyệt hoặc thao tác thư mục máy tính.
-- Chỉ bind vào IPv4 riêng đã chọn; hệ điều hành cấp cổng trống cho mỗi phiên. Không bind 0.0.0.0, không UPnP, không relay/cloud. Listener ngừng khi phiên kết thúc (giữ tối đa khoảng 30 giây cho điện thoại đọc kết quả) hoặc khi tạo phiên mới/đóng app.
+- Nhận tệp mặc định tắt khi mở ứng dụng. Bật nhận tạo listener; Tắt nhận thu hồi quyền gửi, đóng listener ngay cả khi còn kết nối chờ và dọn dữ liệu chưa hoàn tất. Làm mới QR kết thúc phiên cũ trước khi tạo phiên mới; tệp đã lưu được giữ lại.
+- Chỉ bind vào IPv4 riêng đã chọn; hệ điều hành cấp cổng trống cho mỗi phiên. Không bind 0.0.0.0, không UPnP, không relay/cloud. Listener ngừng khi phiên kết thúc (giữ tối đa khoảng 30 giây cho điện thoại đọc kết quả) hoặc ngay khi tắt nhận/tạo phiên mới/đóng app.
 - Dữ liệu nhận theo phần tối đa 8 MiB, kiểm tra dung lượng/vị trí/SHA-256, rollback phần sai và xác minh dữ liệu gửi lại. Tệp tạm chỉ được công bố sau khi kiểm tra SHA-256 trên đĩa; không ghi đè hoặc tự chạy tệp.
 
 SHA-256 phát hiện sai khác dữ liệu; trên HTTP nó không xác thực bên gửi và không bảo vệ khỏi kẻ sửa cả dữ liệu lẫn mã kiểm tra. Phần mềm độc hại có quyền của chính người dùng hệ điều hành nằm ngoài phạm vi bảo vệ này.

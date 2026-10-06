@@ -10,12 +10,13 @@ Kết quả stress: SHA-256 khớp trên 4.303.355.907 bytes, khoảng 135 giây
 Dependency/cache tạm và output build trên VPS được dọn sau kiểm thử theo yêu cầu người dùng. Khi kiểm thử tiếp từ source: chạy `npm ci`, rồi `npm run build` trước Cargo để tạo lại mobile assets.
 
 ## Luồng cơ bản
-1. Cài bộ cài trong Release v0.1.0 Windows/macOS/Linux sau khi CI build thành công. Dùng thư mục test riêng có đủ dung lượng.
+1. Cài bộ cài trong Release v1.0.0 Windows/macOS/Linux sau khi CI build thành công. Dùng thư mục test riêng có đủ dung lượng.
 2. Cho phép QRDrop truy cập LAN/firewall khi OS hỏi. Cùng mạng có thể bị guest/client isolation; tắt VPN hoặc chọn interface thực tế nếu địa chỉ sai.
-3. Quét QR bằng camera → browser mở → chọn file → yêu cầu gửi.
+3. Mở ứng dụng: nhận tệp phải đang tắt. Bấm **Bật nhận tệp**, quét QR bằng camera → browser mở → chọn file → yêu cầu gửi.
 4. **Chưa Accept:** không có file bytes được ghi. Từ chối: không được gửi, phải tạo QR mới.
 5. Accept → quan sát tiến độ phone/desktop → verifying → complete. SHA-256 trong Recent Transfers phải khớp file nguồn thực sự browser cung cấp.
-6. Open Folder mở native file manager. Nhận tiếp/Refresh tạo phiên mới; link cũ không authorize được.
+6. **Mở thư mục** mở trình quản lý tệp. **Làm mới QR** thay mã đang chờ; mã cũ không dùng được. Sau khi gửi xong, **Bật nhận tệp** tạo phiên mới.
+7. **Tắt nhận tệp** khi đang chờ hoặc đang gửi: cổng phải đóng, tệp đã lưu được giữ, phần dở được dọn. Bật lại phải tạo mã mới; đóng app và mở lại vẫn bắt đầu ở trạng thái tắt.
 
 ## Ma trận cần ghi lại
 OS/build version, điện thoại/model, iOS/Android/browser version, picker Files hay Photos, mạng/interface/firewall, filesystem/disk trống, file sizes/hash và kết quả. Không lưu token/URL QR vào report; thay `[REDACTED SECRET]`.

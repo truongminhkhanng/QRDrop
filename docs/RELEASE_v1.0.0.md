@@ -1,5 +1,43 @@
 # QRDrop 1.0.0
 
+English · Tiếng Việt
+
+Receive files from your phone directly on your computer over a local network. Your phone uses a browser; the desktop installer requires no Node.js, npm or Rust.
+
+## What's new
+
+- **Enable / disable receiving:** receiving starts off when you open QRDrop. Turn it on when you need it and close the connection when you are done.
+- **Refresh QR:** replace the current code and invalidate the old one. A pending request or transfer asks for confirmation before it ends.
+- Disabling receiving revokes transfer permission, closes the listening port and removes unfinished data. Completed files are kept.
+- Your computer still approves the file list before any file data is received. The app interface currently uses Vietnamese.
+
+## Install
+
+| Computer | Download |
+|---|---|
+| Windows 64-bit | [Windows installer](https://github.com/truongminhkhanng/QRDrop/releases/download/v1.0.0/QRDrop_1.0.0_x64-setup.exe) |
+| Apple Silicon Mac | [Mac disk image](https://github.com/truongminhkhanng/QRDrop/releases/download/v1.0.0/QRDrop_1.0.0_aarch64.dmg) |
+| Linux 64-bit | [AppImage](https://github.com/truongminhkhanng/QRDrop/releases/download/v1.0.0/QRDrop_1.0.0_amd64.AppImage) |
+| Ubuntu/Debian 64-bit | [Debian package](https://github.com/truongminhkhanng/QRDrop/releases/download/v1.0.0/QRDrop_1.0.0_amd64.deb) |
+
+Open the Windows installer, or open the Mac disk image and drag QRDrop into Applications. For Linux, install the Debian package with your software manager or allow the AppImage to run as a program. There is no Intel Mac installer. Sign in with an authorized GitHub account while the repository is private.
+
+## Get started
+
+Connect both devices to the same reachable network. Open Settings (**Cài đặt**) to choose a save folder, then enable receiving (**Bật nhận tệp**) and scan the QR code. Choose files on your phone, request to send, then approve the list on your computer (**Cho phép**). Keep the phone page open until the transfer finishes.
+
+Files do not travel through a cloud relay and existing files are never overwritten. HTTP is not encrypted: use a trusted network. Photo-library files depend on the data supplied by your phone browser.
+
+## Compatibility and verification
+
+Installers pass automated checks and native packaging on Windows x64, macOS ARM64 and Ubuntu 24.04 x64 before publication. Installation and transfers on real PCs, iPhones and Android devices, multi-GB phone transfers and other Linux distributions still need verification.
+
+Windows has no publisher signature; macOS is ad-hoc signed and is not notarized. The operating system may show a warning. The configured minimum macOS version is 13.0.
+
+---
+
+# QRDrop 1.0.0 — Tiếng Việt
+
 Nhận tệp từ điện thoại về máy tính qua mạng nội bộ. Điện thoại dùng trình duyệt; bộ cài trên máy tính không cần Node.js, npm hay Rust.
 
 ## Điểm mới

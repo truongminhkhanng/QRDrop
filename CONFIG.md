@@ -5,7 +5,7 @@ Project: QRDrop. Description: phone → desktop LAN file receiver. Primary users
 ## Product
 Utility desktop app, Vietnamese UI initially, phone browser, explicit approval. `docs/MVP.md` is the product contract; examples in user briefs are not literal UI requirements.
 ## Features
-Single session/batch/sender; files including zero-byte and arbitrary extensions; chunk retry within live session; SHA-256 before finalize; native folder selection/open; recent successful files. Source: `src-tauri/src/{session,transfer,files,commands}.rs`, `src/{desktop,mobile}/App.tsx`.
+Receiving starts off; desktop enable/disable and QR refresh controls. Single session/batch/sender; files including zero-byte and arbitrary extensions; chunk retry within live session; SHA-256 before finalize; native folder selection/open; recent successful files. Source: `src-tauri/src/{session,transfer,files,commands}.rs`, `src/{desktop,mobile}/App.tsx`.
 ## Auth
 No accounts. Rust random 256-bit join/attempt/upload credentials, approval and state enforced server-side. Join credential consumed at first valid request; identical same-peer retry recovers the original reply. API requires the selected IP plus valid credentials; IP is not identity. Source: `auth.rs`, `session.rs`, `server.rs`. Actual credential values: [SECRET - ENV ONLY] for distribution credentials; session credentials are RAM ONLY, not env.
 ## Database
@@ -13,7 +13,7 @@ No product database server. Local settings/recent JSON and partial journal in OS
 ## API
 Same-origin `/api/connect`, `/api/status`, `/api/files/{id}/chunks`, `/api/files/{id}/finish`, `/api/complete`, `/api/cancel`. Wire definitions: `protocol.rs`; handlers: `server.rs`. No LAN approval or filesystem API.
 ## Integrations / External Services
-No runtime cloud integration/analytics. Authorized source/build repository: `https://github.com/truongminhkhanng/QRDrop`. GitHub Actions builds installers independently of transfer; private non-PR builds store them in draft releases; authorized v0.1.0 prerelease is published at https://github.com/truongminhkhanng/QRDrop/releases/tag/v0.1.0. No third-party QR API/CDN.
+No runtime cloud integration/analytics. Authorized source/build repository: `https://github.com/truongminhkhanng/QRDrop`. GitHub Actions builds installers independently of transfer; private non-PR builds store them in draft releases; v0.1.0 prerelease is retained; v1.0.0 stable release is being prepared. The user authorized public visibility after completion; current tools do not expose repository administration. No third-party QR API/CDN.
 ## Pricing / Analytics / SEO
 Pricing [CHƯA XÁC NHẬN]. Analytics absent. SEO not applicable to desktop utility; marketing website outside current scope.
 ## Deployment
