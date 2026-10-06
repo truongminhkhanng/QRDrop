@@ -93,7 +93,8 @@ async fn mismatch_never_publishes() {
     let id=state["files"][0]["id"].as_str().expect("id");
     let grant=state["grant"].as_str().expect("grant");
     assert_eq!(h.chunk(grant,id,0,b"abc").await.status(),StatusCode::OK);
-    assert_eq!(h.request(Method::POST,&format!("/api/files/{id}/finish")).bearer_auth(grant).json(&json!({"sha256":hex::encode(Sha256::digest(b"xyz")))})).send().await.expect("finish").status(),StatusCode::ACCEPTED);
+    let wrong_digest = hex::encode(Sha256::digest(b"xyz"));
+    assert_eq!(h.request(Method::POST,&format!("/api/files/{id}/finish")).bearer_auth(grant).json(&json!({"sha256":wrong_digest})).send().await.expect("finish").status(),StatusCode::ACCEPTED);
     for _ in 0..100 { if h.status(attempt).await["state"]=="FAILED" {break;} tokio::time::sleep(Duration::from_millis(20)).await; }
     assert_eq!(h.status(attempt).await["state"],"FAILED");
     assert!(!h.destination.join("bad.mov").exists());
