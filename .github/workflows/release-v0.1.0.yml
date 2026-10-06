@@ -1,5 +1,8 @@
 name: Publish authorized QRDrop v0.1.0
 on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-v0.1.0.yml']
   workflow_run:
     workflows: ['Build QRDrop installers']
     types: [completed]
@@ -13,11 +16,12 @@ jobs:
   publish:
     if: >-
       github.repository == 'truongminhkhanng/QRDrop' &&
-      github.event.workflow_run.id == 37471485522 &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.id == 37471485522 &&
       github.event.workflow_run.head_sha == 'f118e962e0af655e43e5f061b06cabe434ff0eec' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
