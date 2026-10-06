@@ -118,8 +118,7 @@ impl Manager {
             inner.last_progress = Instant::now();
             inner.join_token.clear();
         } else {
-            drop(inner);
-            session.terminate(SessionState::Rejected, None).await;
+            session.terminate_inner(&mut inner, SessionState::Rejected, None);
         }
         Ok(())
     }
@@ -152,6 +151,9 @@ impl Session {
     }
     pub async fn terminate(&self, requested: SessionState, error: Option<String>) {
         let mut inner = self.inner.lock().await;
+        self.terminate_inner(&mut inner, requested, error);
+    }
+    fn terminate_inner(&self, inner: &mut SessionInner, requested: SessionState, error: Option<String>) {
         if inner.state.terminal() { return; }
         inner.state = if requested != SessionState::Completed && inner.files.iter().any(|f| f.status == FileState::Complete) { SessionState::PartiallyCompleted } else { requested };
         inner.join_token.clear(); inner.grant = None;

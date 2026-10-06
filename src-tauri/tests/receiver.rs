@@ -152,3 +152,55 @@ fn staging_symlink_cannot_escape_destination() {
     assert!(files::create(&destination,&state,&uuid::Uuid::new_v4().to_string()).is_err());
     assert_eq!(std::fs::read_dir(outside).expect("outside directory").count(),0);
 }
+
+#[tokio::test]
+async fn large_chunks_roll_back_bad_digest_and_reject_wrong_offsets() {
+    let h=Harness::new().await;
+    let data=vec![0xa5; qrdrop_lib::config::CHUNK_BYTES as usize+17];
+    let first=&data[..qrdrop_lib::config::CHUNK_BYTES as usize];
+    let connection=h.request_transfer(&[("large.bin",data.len() as u64)]).await;
+    let attempt=connection["attempt_token"].as_str().expect("attempt");
+    let approved=h.accept(attempt).await;
+    let grant=approved["grant"].as_str().expect("grant");
+    let id=approved["files"][0]["id"].as_str().expect("id");
+    let wrong=h.request(Method::PUT,&format!("/api/files/{id}/chunks")).bearer_auth(grant)
+        .header("content-type","application/octet-stream").header("x-qrdrop-offset",0)
+        .header("x-qrdrop-length",first.len()).header("x-qrdrop-sha256","0".repeat(64))
+        .body(first.to_vec()).send().await.expect("bad digest request");
+    assert_eq!(wrong.status(),StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(h.status(attempt).await["files"][0]["received"],0);
+    let part=h.destination.join(".qrdrop-partials").join(h.manager.active().await.expect("session").id.clone()).join(format!("{id}.part"));
+    assert_eq!(std::fs::metadata(part).expect("staging file").len(),0);
+    assert_eq!(h.chunk(grant,id,0,first).await.status(),StatusCode::OK);
+    assert_eq!(h.chunk(grant,id,0,first).await.status(),StatusCode::OK);
+    assert_eq!(h.chunk(grant,id,1,b"x").await.status(),StatusCode::CONFLICT);
+    assert!(!h.destination.join("large.bin").exists());
+    assert_eq!(h.chunk(grant,id,first.len() as u64,&data[first.len()..]).await.status(),StatusCode::OK);
+    h.finish(grant,attempt,id,&data).await;
+    assert_eq!(std::fs::read(h.destination.join("large.bin")).expect("received file"),data);
+    h.stop().await;
+}
+
+#[tokio::test(flavor="multi_thread",worker_threads=2)]
+async fn concurrent_accept_and_reject_have_exactly_one_winner() {
+    let h=Harness::new().await;
+    h.request_transfer(&[("decision.bin",1)]).await;
+    let session=h.manager.active().await.expect("session");
+    let barrier=Arc::new(tokio::sync::Barrier::new(3));
+    let mut tasks=Vec::new();
+    for accept in [false,true] {
+        let manager=h.manager.clone();
+        let id=session.id.clone();
+        let barrier=barrier.clone();
+        tasks.push(tokio::spawn(async move { barrier.wait().await; manager.decide(&id,accept).await }));
+    }
+    barrier.wait().await;
+    let mut winners=0;
+    for task in tasks { if task.await.expect("decision task").is_ok() { winners+=1; } }
+    assert_eq!(winners,1);
+    let inner=session.inner.lock().await;
+    assert!(matches!(inner.state,SessionState::Approved|SessionState::Rejected));
+    assert_eq!(inner.grant.is_some(),inner.state==SessionState::Approved);
+    drop(inner);
+    h.stop().await;
+}
