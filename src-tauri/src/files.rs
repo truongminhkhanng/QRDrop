@@ -1,9 +1,15 @@
 use crate::errors::{AppError, Result};
 use cap_std::{ambient_authority, fs::{Dir, OpenOptions}};
 use serde::{Deserialize, Serialize};
-use std::{path::{Path, PathBuf}, sync::Arc};
+use std::{path::{Path, PathBuf}, sync::{Arc, Mutex}};
 
-pub struct Storage { pub destination: Arc<Dir>, pub staging: Arc<Dir>, pub root: PathBuf, pub relative: String }
+pub struct Storage { pub destination: Arc<Dir>, staging: Mutex<Option<Dir>>, pub root: PathBuf, pub relative: String }
+impl Storage {
+    fn with_staging<T>(&self, operation: impl FnOnce(&Dir) -> Result<T>) -> Result<T> {
+        let staging = self.staging.lock().map_err(|_| AppError::conflict("Không thể truy cập thư mục tạm."))?;
+        operation(staging.as_ref().ok_or_else(|| AppError::conflict("Thư mục tạm đã được đóng."))?)
+    }
+}
 #[derive(Serialize, Deserialize)]
 struct Journal { version: u8, destination: PathBuf, session_id: String }
 
@@ -28,7 +34,7 @@ pub fn create(root: &Path, state_dir: &Path, session_id: &str) -> Result<Storage
     destination.create_dir_all(".qrdrop-partials")?;
     let relative = format!(".qrdrop-partials/{session_id}");
     destination.create_dir(&relative)?;
-    let staging = Arc::new(destination.open_dir(&relative)?);
+    let staging = destination.open_dir(&relative)?;
     #[cfg(unix)] {
         use std::os::unix::fs::PermissionsExt;
         staging.set_permissions(".", cap_std::fs::Permissions::from_std(std::fs::Permissions::from_mode(0o700)))?;
@@ -36,17 +42,17 @@ pub fn create(root: &Path, state_dir: &Path, session_id: &str) -> Result<Storage
     let journal = Journal { version: 1, destination: root.clone(), session_id: session_id.to_owned() };
     let bytes = serde_json::to_vec(&journal).map_err(|_| AppError::invalid("Không thể tạo nhật ký tệp tạm."))?;
     std::fs::write(state_dir.join("partial-journal.json"), bytes)?;
-    let storage = Storage { destination, staging, root, relative };
+    let storage = Storage { destination, staging: Mutex::new(Some(staging)), root, relative };
     // Fail before approval/data transfer if this filesystem cannot publish safely.
     let probe = uuid::Uuid::new_v4().to_string();
     let linked = uuid::Uuid::new_v4().to_string();
-    let check: std::io::Result<()> = (|| {
-        drop(storage.staging.open_with(format!("{probe}.part"), OpenOptions::new().write(true).create_new(true))?);
-        storage.staging.hard_link(format!("{probe}.part"), &storage.staging, format!("{linked}.part"))?;
-        storage.staging.remove_file(format!("{linked}.part"))?;
-        storage.staging.remove_file(format!("{probe}.part"))?;
+    let check = storage.with_staging(|staging| {
+        drop(staging.open_with(format!("{probe}.part"), OpenOptions::new().write(true).create_new(true))?);
+        staging.hard_link(format!("{probe}.part"), staging, format!("{linked}.part"))?;
+        staging.remove_file(format!("{linked}.part"))?;
+        staging.remove_file(format!("{probe}.part"))?;
         Ok(())
-    })();
+    });
     if let Err(error) = check {
         if let Err(cleanup_error) = cleanup(&storage, &[probe, linked], state_dir) {
             return Err(AppError::invalid(format!("Không thể lưu an toàn vào thư mục đã chọn: {error}. Không dọn được staging: {cleanup_error}")));
@@ -56,32 +62,39 @@ pub fn create(root: &Path, state_dir: &Path, session_id: &str) -> Result<Storage
     Ok(storage)
 }
 pub fn open_part(storage: &Storage, id: &str) -> Result<tokio::fs::File> {
-    let file = storage.staging.open_with(format!("{id}.part"), OpenOptions::new().read(true).write(true).create_new(true))?;
+    let file = storage.with_staging(|staging| Ok(staging.open_with(format!("{id}.part"), OpenOptions::new().read(true).write(true).create_new(true))?))?;
     Ok(tokio::fs::File::from_std(file.into_std()))
 }
 pub fn publish(storage: &Storage, id: &str, name: &str) -> Result<(String, Option<String>)> {
-    let path = Path::new(name);
-    let ext = path.extension().and_then(|s| s.to_str());
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or(name);
-    for suffix in 0..10_000 {
-        let candidate = if suffix == 0 { name.to_owned() } else if let Some(ext) = ext { format!("{stem} ({suffix}).{ext}") } else { format!("{name} ({suffix})") };
-        // Hard-link creates the final directory entry atomically, with no replacement.
-        match storage.staging.hard_link(format!("{id}.part"), &storage.destination, &candidate) {
-            Ok(()) => {
-                // Publication has succeeded: a cleanup error must not cause duplicate publication.
-                let warning = storage.staging.remove_file(format!("{id}.part")).err().map(|e| format!("Tệp đã lưu, nhưng chưa dọn được liên kết tạm: {e}"));
-                return Ok((candidate, warning));
+    storage.with_staging(|staging| {
+        let path = Path::new(name);
+        let ext = path.extension().and_then(|s| s.to_str());
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or(name);
+        for suffix in 0..10_000 {
+            let candidate = if suffix == 0 { name.to_owned() } else if let Some(ext) = ext { format!("{stem} ({suffix}).{ext}") } else { format!("{name} ({suffix})") };
+            // Hard-link creates the final directory entry atomically, with no replacement.
+            match staging.hard_link(format!("{id}.part"), &storage.destination, &candidate) {
+                Ok(()) => {
+                    // Publication has succeeded: a cleanup error must not cause duplicate publication.
+                    let warning = staging.remove_file(format!("{id}.part")).err().map(|e| format!("Tệp đã lưu, nhưng chưa dọn được liên kết tạm: {e}"));
+                    return Ok((candidate, warning));
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(e) => return Err(e.into()),
             }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(e.into()),
         }
-    }
-    Err(AppError::conflict("Có quá nhiều tệp trùng tên."))
+        Err(AppError::conflict("Có quá nhiều tệp trùng tên."))
+    })
 }
 pub fn cleanup(storage: &Storage, ids: &[String], state_dir: &Path) -> Result<()> {
-    for id in ids {
-        match storage.staging.remove_file(format!("{id}.part")) { Ok(()) => {}, Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}, Err(e) => return Err(e.into()) }
+    let mut handle = storage.staging.lock().map_err(|_| AppError::conflict("Không thể truy cập thư mục tạm."))?;
+    if let Some(staging) = handle.as_ref() {
+        for id in ids {
+            match staging.remove_file(format!("{id}.part")) { Ok(()) => {}, Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}, Err(e) => return Err(e.into()) }
+        }
     }
+    // Windows forbids deleting a directory while its capability handle is open.
+    drop(handle.take());
     match storage.destination.remove_dir(&storage.relative) { Ok(()) => {}, Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}, Err(e) => return Err(e.into()) }
     // An old session's cleanup must never remove a newer session's journal.
     let journal_path = state_dir.join("partial-journal.json");
@@ -114,6 +127,7 @@ pub fn recover(state_dir: &Path) -> Result<()> {
         }
         staging.remove_file(name)?;
     }
+    drop(staging);
     dir.remove_dir(relative)?;
     remove_journal(state_dir)
 }

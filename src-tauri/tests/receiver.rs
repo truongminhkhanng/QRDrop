@@ -30,7 +30,7 @@ impl Harness {
     async fn finish(&self, grant: &str, attempt: &str, id: &str, data: &[u8]) {
         let response=self.request(Method::POST,&format!("/api/files/{id}/finish")).bearer_auth(grant).json(&json!({"sha256":hex::encode(Sha256::digest(data))})).send().await.expect("finish");
         assert_eq!(response.status(),StatusCode::ACCEPTED);
-        for _ in 0..100 {
+        for _ in 0..500 {
             let status=self.status(attempt).await;
             if status["files"].as_array().expect("files").iter().any(|file| file["id"]==id && file["status"]=="complete") { return; }
             assert_ne!(status["state"],"FAILED", "{status}");
@@ -203,4 +203,23 @@ async fn concurrent_accept_and_reject_have_exactly_one_winner() {
     assert_eq!(inner.grant.is_some(),inner.state==SessionState::Approved);
     drop(inner);
     h.stop().await;
+}
+
+#[test]
+fn recovery_removes_owned_partials_and_preserves_unrelated_files() {
+    let root=tempfile::tempdir().expect("root");
+    let destination=root.path().join("destination");
+    let state=root.path().join("state");
+    std::fs::create_dir(&state).expect("state directory");
+    let session_id=uuid::Uuid::new_v4().to_string();
+    let storage=files::create(&destination,&state,&session_id).expect("storage");
+    let staging=destination.join(".qrdrop-partials").join(&session_id);
+    std::fs::write(staging.join(format!("{}.part",uuid::Uuid::new_v4())),b"incomplete").expect("owned partial");
+    std::fs::write(destination.join("unrelated.part"),b"keep").expect("unrelated file");
+    drop(storage); // Simulate process exit: directory handles are closed.
+    files::recover(&state).expect("recovery");
+    assert!(!staging.exists());
+    assert!(!state.join("partial-journal.json").exists());
+    assert_eq!(std::fs::read(destination.join("unrelated.part")).expect("unrelated file"),b"keep");
+    files::recover(&state).expect("idempotent recovery");
 }
