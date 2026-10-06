@@ -17,7 +17,7 @@ Mở [QRDrop 1.0.0](https://github.com/truongminhkhanng/QRDrop/releases/tag/v1.0
 
 **Không cần cài Node.js, npm hay Rust.** Chưa có bộ cài cho Mac Intel. Cấu hình macOS tối thiểu là 13.0.
 
-Trang tải hiện giới hạn quyền truy cập. Nếu không thấy Release, hãy đăng nhập GitHub bằng tài khoản được cấp quyền.
+Nếu repository còn riêng tư, hãy đăng nhập GitHub bằng tài khoản được cấp quyền để tải. Khi Release công khai, bạn có thể tải mà không cần đăng nhập.
 
 Windows chưa có chữ ký nhà phát hành; macOS chưa notarize. Hệ điều hành có thể hiện cảnh báo khi mở bộ cài. Khả năng cài đặt và sử dụng trên từng thiết bị vẫn cần kiểm tra.
 
@@ -52,6 +52,6 @@ QRDrop kiểm tra dữ liệu trước khi lưu hoàn tất và không ghi đè 
 
 Tệp đi trực tiếp từ điện thoại đến máy tính, không qua máy chủ đám mây. Máy tính phải cho phép trước khi nhận dữ liệu.
 
-**Kết nối HTTP chưa mã hóa. Chỉ dùng trên mạng bạn tin cậy.** Mã QR và quyền gửi không thay thế mã hóa mạng. Xem [thông tin bảo mật](SECURITY.md) để biết thêm.
+**Kết nối HTTP chưa mã hóa. Chỉ dùng trên mạng bạn tin cậy.** Mã QR và quyền gửi không thay thế mã hóa mạng. Xem [thông tin bảo mật](SECURITY.vi.md) để biết thêm.
 
 QRDrop giữ nguyên dữ liệu tệp do trình duyệt cung cấp. Với ảnh hoặc video chọn từ Photos, dữ liệu có thể khác bản gốc trong thư viện của điện thoại.

@@ -76,3 +76,14 @@ Mã QR chỉ tạo một yêu cầu hợp lệ. Dữ liệu không qua máy ch�
 Bộ cài được kiểm thử tự động và đóng gói trên Windows x64, macOS ARM64 và Ubuntu 24.04 x64 trước khi phát hành. Cài đặt và truyền tệp trên PC/iPhone/Android thật, tệp nhiều GB và khả năng tương thích từng bản Linux vẫn cần nghiệm thu.
 
 Windows chưa có chữ ký nhà phát hành; macOS ký ad-hoc, chưa notarize. Hệ điều hành có thể hiện cảnh báo khi mở. Cấu hình macOS tối thiểu là 13.0; chưa xác minh trên mọi thiết bị.
+
+Source ứng dụng đã kiểm thử: `523b49acfec366390313bfedfda42992f05a5c01`. Tag phát hành: `2ef17c68da39537f16a7d69fb1152d44d3f55c6c` (cùng mã ứng dụng và lockfile). [Kiểm thử và build](https://github.com/truongminhkhanng/QRDrop/actions/runs/37482136952).
+
+## Mã kiểm tra SHA-256
+
+| Bộ cài | Bytes | SHA-256 |
+|---|---:|---|
+| QRDrop_1.0.0_x64-setup.exe | 218094443 | `d8b5e41b11d0b638dc7ed5429ecd6407283cd8f3abdb0d8a34474167fd0c2040` |
+| QRDrop_1.0.0_aarch64.dmg | 4005291 | `2001b0bc74fdfdbb0533ce4f892167e172f848be291906cd1fd9ffea0d46ec95` |
+| QRDrop_1.0.0_amd64.AppImage | 80476664 | `a392b732e42a1178dbeed016048520d33413a86e886149ebd52e9e9e8b3cccdc` |
+| QRDrop_1.0.0_amd64.deb | 4961130 | `8ec37aefe813c58ebe02c63e08b5268915ce12cfce7d063d2931e349bf45abf7` |

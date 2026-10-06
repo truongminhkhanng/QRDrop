@@ -13,7 +13,7 @@ No product database server. Local settings/recent JSON and partial journal in OS
 ## API
 Same-origin `/api/connect`, `/api/status`, `/api/files/{id}/chunks`, `/api/files/{id}/finish`, `/api/complete`, `/api/cancel`. Wire definitions: `protocol.rs`; handlers: `server.rs`. No LAN approval or filesystem API.
 ## Integrations / External Services
-No runtime cloud integration/analytics. Authorized source/build repository: `https://github.com/truongminhkhanng/QRDrop`. GitHub Actions builds installers independently of transfer; private non-PR builds store them in draft releases; v0.1.0 prerelease is retained; v1.0.0 stable release is being prepared. The user authorized public visibility after completion; current tools do not expose repository administration. No third-party QR API/CDN.
+No runtime cloud integration/analytics. Authorized source/build repository: `https://github.com/truongminhkhanng/QRDrop`. GitHub Actions builds installers independently of transfer; private non-PR builds store them in draft releases; v0.1.0 prerelease is retained; v1.0.0 is published as the latest stable release at https://github.com/truongminhkhanng/QRDrop/releases/tag/v1.0.0. The owner will apply Public visibility manually; About fields are prepared in .github/PROJECT_ABOUT.md. No third-party QR API/CDN.
 ## Pricing / Analytics / SEO
 Pricing [CHƯA XÁC NHẬN]. Analytics absent. SEO not applicable to desktop utility; marketing website outside current scope.
 ## Deployment

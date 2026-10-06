@@ -1,25 +1,35 @@
-# Bảo mật QRDrop
+# QRDrop security
 
-## Phạm vi
+**English** · [Tiếng Việt](SECURITY.vi.md)
 
-QRDrop nhận tệp trên mạng nội bộ tin cậy. Kết nối HTTP hiện không mã hóa; người có khả năng nghe lén hoặc sửa lưu lượng mạng có thể lấy token, dữ liệu hoặc thay nội dung trang. Không dùng bản này trên mạng không tin cậy. Một cổng ngẫu nhiên và token dùng một lần không thay thế HTTPS/TLS với chứng chỉ được thiết bị tin cậy. Xem [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
+## Intended use
 
-## Các kiểm tra trong ứng dụng
+QRDrop receives files over a trusted local network. Its HTTP connection is **not encrypted**. Someone who can intercept or modify network traffic may obtain credentials or file data, or alter the phone page. A random port and a single-request QR code do not replace HTTPS with a certificate your devices trust.
 
-- Token ngẫu nhiên 256 bit do hệ điều hành cấp nguồn ngẫu nhiên; so sánh credential theo thời gian cố định. Token chỉ tồn tại trong RAM; không ghi ra log, lịch sử hoặc code index.
-- Token QR hết hạn sau 10 phút, chỉ tạo một yêu cầu với danh sách tệp cố định và bị xóa ngay khi yêu cầu hợp lệ được tiếp nhận. Gửi lại đúng yêu cầu từ cùng IP chỉ lấy lại phản hồi cũ để phục hồi mất kết nối.
-- Token theo dõi và quyền gửi là hai credential riêng. Máy tính phải cho phép qua IPC local trước khi ghi dữ liệu tệp. Hủy, từ chối, hết hạn hoặc hoàn tất thu hồi quyền gửi.
-- API chỉ chấp nhận IP đã kết nối, đồng thời vẫn yêu cầu đúng credential và trạng thái phiên. IP không chứng minh danh tính: nhiều thiết bị có thể dùng chung IP qua NAT/proxy; thiết bị đổi IP cần tạo phiên mới.
-- Máy chủ kiểm tra schema, từ chối trường lạ, kiểm tra tên/dung lượng/số lượng tệp, giới hạn nội dung yêu cầu trước khi đọc JSON, và không nhận đường dẫn do điện thoại chỉ định. Xem [OWASP Input Validation](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html).
-- Kiểm tra Host/Origin/Sec-Fetch-Site, giới hạn số kết nối/yêu cầu và tần suất kết nối, thời gian chờ và tiến triển; không có API LAN để phê duyệt hoặc thao tác thư mục máy tính.
-- Nhận tệp mặc định tắt khi mở ứng dụng. Bật nhận tạo listener; Tắt nhận thu hồi quyền gửi, đóng listener ngay cả khi còn kết nối chờ và dọn dữ liệu chưa hoàn tất. Làm mới QR kết thúc phiên cũ trước khi tạo phiên mới; tệp đã lưu được giữ lại.
-- Chỉ bind vào IPv4 riêng đã chọn; hệ điều hành cấp cổng trống cho mỗi phiên. Không bind 0.0.0.0, không UPnP, không relay/cloud. Listener ngừng khi phiên kết thúc (giữ tối đa khoảng 30 giây cho điện thoại đọc kết quả) hoặc ngay khi tắt nhận/tạo phiên mới/đóng app.
-- Dữ liệu nhận theo phần tối đa 8 MiB, kiểm tra dung lượng/vị trí/SHA-256, rollback phần sai và xác minh dữ liệu gửi lại. Tệp tạm chỉ được công bố sau khi kiểm tra SHA-256 trên đĩa; không ghi đè hoặc tự chạy tệp.
+## Receiving controls
 
-SHA-256 phát hiện sai khác dữ liệu; trên HTTP nó không xác thực bên gửi và không bảo vệ khỏi kẻ sửa cả dữ liệu lẫn mã kiểm tra. Phần mềm độc hại có quyền của chính người dùng hệ điều hành nằm ngoài phạm vi bảo vệ này.
+Receiving starts off when the desktop app opens. Enabling receiving creates a new session and listening port. Disabling receiving revokes transfer permission, closes the listener even when an idle connection remains, and cleans up unfinished data. Completed files are kept.
 
-## Kiểm thử và báo lỗi
+Refreshing the QR code ends the previous session before creating a new one. After a session ends naturally, the listener may remain for about 30 seconds so the phone can read the result. Explicitly disabling receiving closes it immediately.
 
-Xem [docs/BUILD_STATUS.md](docs/BUILD_STATUS.md) để biết source/run đã kiểm thử và [docs/TESTING.md](docs/TESTING.md) để nghiệm thu trên thiết bị thật. Kiểm thử peer khác dùng hai địa chỉ loopback trên Linux; không thay thế nghiệm thu hai điện thoại/PC thật. Bộ cài Windows chưa có chữ ký nhà phát hành; macOS ký ad-hoc, chưa notarize.
+## Access and input checks
 
-Khi báo lỗi trong repository riêng tư, ghi phiên bản, OS, bước tái hiện và thông báo lỗi. Không đính kèm token, URL QR đầy đủ, tệp riêng tư hoặc credential; dùng [REDACTED SECRET].
+- Credentials use 256 bits of operating-system randomness and constant-time comparison. They are held in memory, not written to application logs or history.
+- A QR credential expires after 10 minutes and can create one valid request with a fixed file list. It is consumed when that request is accepted. An identical retry from the same peer can recover the original response.
+- Status and upload credentials are separate. The desktop must approve the file list before any file data is written. Cancellation, rejection, expiry or completion revokes upload permission.
+- APIs require the selected peer IP, a valid credential and the correct session state. IP addresses are an extra restriction, not proof of identity: devices can share an address through NAT or a proxy. A phone that changes IP needs a new session.
+- The receiver validates the request schema, rejects unknown fields and checks file names, sizes and counts. Request bodies, connections, concurrency and connection attempts are bounded. The phone cannot choose filesystem paths.
+- Host, Origin and Sec-Fetch-Site checks restrict web requests. Local desktop approval and folder operations are not exposed through the network API.
+- The listener binds only to the selected private IPv4 address, using an available port assigned by the operating system. QRDrop does not bind to all interfaces, configure port forwarding or use a cloud relay.
+
+## File handling
+
+Data arrives in chunks of at most 8 MiB. The receiver checks size, position and SHA-256, rolls back an invalid chunk and verifies retried data without appending it twice. A staged file becomes a completed file only after its on-disk SHA-256 is checked. Existing files are never overwritten, and received files are not automatically executed.
+
+SHA-256 detects data differences. Over HTTP, it does not authenticate the sender or prevent an attacker from replacing both the data and its hash. Malicious local software running with the same operating-system user permissions is outside these protections.
+
+## Verification and reporting
+
+See [build results](docs/BUILD_STATUS.md) for automated evidence and [device testing](docs/TESTING.md) for the remaining checks. Loopback tests do not replace installation and transfers on real phones and computers. Windows installers have no publisher signature; macOS builds are ad-hoc signed and are not notarized.
+
+When reporting a problem, include the QRDrop version, operating system, reproduction steps and error message. Do not attach credentials, a complete QR URL or private files. Replace sensitive values with `[REDACTED SECRET]`.

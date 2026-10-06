@@ -19,7 +19,7 @@ Choose the installer for your computer:
 
 **No Node.js, npm or Rust installation is needed.** The Mac installer is for Apple Silicon; Intel Macs are not supported. The configured minimum macOS version is 13.0.
 
-The download page currently requires a GitHub account with repository access. If the page is unavailable, sign in with an account that has access.
+If the repository is private, downloads require a GitHub account with repository access. A public release can be downloaded without signing in.
 
 Windows installers do not yet have a publisher signature. macOS builds are ad-hoc signed and are not notarized, so your operating system may show a warning. Installation and phone transfers still need verification on real devices. The app interface currently uses Vietnamese; the button labels below match the app.
 
