@@ -19,4 +19,4 @@ Trace QR join → attempt/manifest → desktop decision → upload grant → chu
 ## inspect-safe-file-lifecycle
 Trace approved file ID → bounded chunk → rollback/ACK → disk hash → no-clobber publication → recent record → cleanup/journal. Check zero-byte, collisions, traversal, cap directory containment, storage errors and cancellation. Never remove unrelated `.part` files.
 ## prepare-native-test-build
-Build both frontends first. Resolve/commit Cargo.lock when network becomes available. Run backend tests; compile Tauri on each native runner; download CI artifacts; real iPhone/Android LAN test on user's PC. Keep signing secrets outside repo. A successful build doesn't prove device compatibility.
+Build both frontends first. Use committed npm/Cargo lockfiles and Cargo --locked. Run backend tests; compile Tauri on each native runner; retrieve installers from private draft releases (Actions artifacts for PR/public builds); real iPhone/Android LAN test on user's PC. Keep signing secrets outside repo. A successful build doesn't prove device compatibility.

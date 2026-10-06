@@ -1,0 +1,65 @@
+name: Publish authorized QRDrop v0.1.0
+on:
+  workflow_run:
+    workflows: ['Build QRDrop installers']
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: qrdrop-release-v0.1.0
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'truongminhkhanng/QRDrop' &&
+      github.event.workflow_run.id == 37468085213 &&
+      github.event.workflow_run.head_sha == '27c1ad2a3c091b3ac3ee8ee97e940a6571dc5e89' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Validate tested source and assets, then publish
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const repo = context.repo;
+            const SOURCE = '27c1ad2a3c091b3ac3ee8ee97e940a6571dc5e89';
+            const RUN_ID = 37468085213;
+            const check = (ok, message) => { if (!ok) throw new Error(message); };
+            const { data: metadata } = await github.rest.repos.get(repo);
+            check(metadata.private, 'Repository must remain private');
+            const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: RUN_ID });
+            check(run.head_sha === SOURCE && run.status === 'completed' && run.conclusion === 'success' && run.event === 'push' && run.head_branch === 'main', 'Authorized build is not successful');
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, { ...repo, run_id: RUN_ID, filter: 'latest', per_page: 100 });
+            check(jobs.length === 3 && jobs.every(job => job.status === 'completed' && job.conclusion === 'success'), 'All three native jobs must succeed');
+            const releases = await github.paginate(github.rest.repos.listReleases, { ...repo, per_page: 100 });
+            const version = releases.find(release => release.tag_name === 'v0.1.0');
+            check(!version || version.target_commitish === SOURCE, 'Existing version belongs to another source');
+            const release = version || releases.find(release => release.tag_name === `test-${RUN_ID}-${run.run_attempt}`);
+            check(release && release.target_commitish === SOURCE, 'Matching test release missing');
+            check(release.draft || (release.tag_name === 'v0.1.0' && release.prerelease), 'Unexpected release state');
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...repo, release_id: release.id, per_page: 100 });
+            const expected = ['QRDrop_0.1.0_x64-setup.exe', 'QRDrop_0.1.0_aarch64.dmg', 'QRDrop_0.1.0_amd64.AppImage', 'QRDrop_0.1.0_amd64.deb'];
+            check(assets.length === expected.length && expected.every(name => assets.filter(asset => asset.name === name).length === 1), 'Installer set incomplete');
+            check(assets.every(asset => asset.state === 'uploaded' && asset.size > 0 && /^sha256:[0-9a-f]{64}$/.test(asset.digest || '')), 'Installer metadata invalid');
+            const { data: notesFile } = await github.rest.repos.getContent({ ...repo, path: 'docs/RELEASE_v0.1.0.md', ref: context.sha });
+            check(notesFile.type === 'file', 'Release notes missing');
+            const notes = Buffer.from(notesFile.content, 'base64').toString('utf8');
+            let tag;
+            try { tag = (await github.rest.git.getRef({ ...repo, ref: 'tags/v0.1.0' })).data; }
+            catch (error) { if (error.status !== 404) throw error; }
+            if (tag) check(tag.object.type === 'commit' && tag.object.sha === SOURCE, 'Version tag points to another source');
+            else await github.rest.git.createRef({ ...repo, ref: 'refs/tags/v0.1.0', sha: SOURCE });
+            const rows = expected.map(name => { const asset = assets.find(item => item.name === name); return `| ${name} | ${asset.size} | \`${asset.digest.slice(7)}\` |`; });
+            const body = notes + `\nSource: \`${SOURCE}\`. [Kiểm thử và build](${run.html_url}).\n\n## Mã kiểm tra SHA-256\n\n| Bộ cài | Bytes | SHA-256 |\n|---|---:|---|\n` + rows.join('\n') + '\n';
+            const { data: published } = await github.rest.repos.updateRelease({ ...repo, release_id: release.id, tag_name: 'v0.1.0', target_commitish: SOURCE, name: 'QRDrop 0.1.0 — Bản thử nghiệm', body, draft: false, prerelease: true, make_latest: 'false' });
+            check(!published.draft && published.prerelease && published.tag_name === 'v0.1.0' && published.published_at, 'Publication failed');
+            const after = await github.paginate(github.rest.repos.listReleaseAssets, { ...repo, release_id: release.id, per_page: 100 });
+            check(after.length === assets.length && assets.every(asset => after.some(item => item.id === asset.id && item.name === asset.name && item.digest === asset.digest && item.size === asset.size)), 'Published assets changed');
+            core.info(`Published ${published.html_url}`);
+            await core.summary.addHeading('QRDrop v0.1.0 published').addLink('Download installers', published.html_url).addTable([['Installer', 'Bytes', 'SHA-256'], ...expected.map(name => { const asset = assets.find(item => item.name === name); return [name, String(asset.size), asset.digest]; })]).write();

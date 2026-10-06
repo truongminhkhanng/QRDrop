@@ -13,11 +13,11 @@ No product database server. Local settings/recent JSON and partial journal in OS
 ## API
 Same-origin `/api/connect`, `/api/status`, `/api/files/{id}/chunks`, `/api/files/{id}/finish`, `/api/complete`, `/api/cancel`. Wire definitions: `protocol.rs`; handlers: `server.rs`. No LAN approval or filesystem API.
 ## Integrations / External Services
-No runtime cloud integration/analytics. Authorized source/build repository: `https://github.com/truongminhkhanng/QRDrop`. GitHub Actions builds artifacts only, independent of transfer. No third-party QR API/CDN.
+No runtime cloud integration/analytics. Authorized source/build repository: `https://github.com/truongminhkhanng/QRDrop`. GitHub Actions builds installers independently of transfer; private non-PR builds store them in unpublished draft releases. No third-party QR API/CDN.
 ## Pricing / Analytics / SEO
 Pricing [CHƯA XÁC NHẬN]. Analytics absent. SEO not applicable to desktop utility; marketing website outside current scope.
 ## Deployment
-`src-tauri/tauri.conf.json`, `.github/workflows/build.yml`. Provisional identifier `app.qrdrop.desktop` [CHƯA XÁC NHẬN]. macOS min config 13.0 is provisional, not proof of tested support. Windows x64 and Linux x64 build targets; ARM64 Windows/Linux postponed.
+`src-tauri/tauri.conf.json`, `.github/workflows/build.yml`. Provisional identifier `app.qrdrop.desktop` [CHƯA XÁC NHẬN]. macOS min config 13.0 is provisional, not proof of tested support. Windows x64, macOS Apple Silicon ARM64 and Linux x64 build targets; ARM64 Windows/Linux postponed. Rust Tauri and npm API pinned to 2.12.1 with CI-resolved Cargo/npm lockfiles.
 ## Limits / Important Constants
 Reference constants, don't duplicate technical config: `src-tauri/src/config.rs`; transport bounds: `server.rs`; chunk timeout: `transfer.rs`. QR approval deadline differs from authorized transfer deadline.
 ## Environment Variables

@@ -13,3 +13,7 @@
 11. **Session sau:** chỉ cần `@AGENT.md [task]`; selective context/index/source verification/history-memory workflow đã ghi trong entry point.
 
 Source archive không chứa node_modules, target, credentials, generated cache hoặc build outputs. Nó không phải bộ cài executable. Chưa upload GitHub/chưa phát hành.
+
+
+## Kết quả sau khởi tạo
+Báo cáo trên ghi lại trạng thái ban đầu. Kết quả sửa lỗi, native CI và bộ cài hiện tại: [BUILD_STATUS.md](BUILD_STATUS.md).

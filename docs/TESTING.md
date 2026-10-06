@@ -1,7 +1,7 @@
 # Kiểm thử QRDrop trên máy thật
 
-## Kết quả đã có ở VPS
-Ngày 2026-10-06: strict TypeScript và production builds của desktop/mobile pass; SHA-256 so với Node crypto và các fixture code index pass. Asset references nội bộ và hash Worker trong mobile bundle đã được kiểm tra tĩnh. Rust test dừng trước compile vì chưa có Axum trong cache; VPS không phân giải được `index.crates.io`. Native compile, bộ cài và truyền file trên điện thoại thật vẫn chưa được xác minh. Xem MEMORY và history để lấy kết quả mới nhất.
+## Kết quả khởi tạo trên VPS (lịch sử)
+Ngày 2026-10-06: strict TypeScript và production builds của desktop/mobile pass; SHA-256 so với Node crypto và các fixture code index pass. Asset references nội bộ và hash Worker trong mobile bundle đã được kiểm tra tĩnh. Rust test dừng trước compile vì chưa có Axum trong cache; VPS không phân giải được `index.crates.io`. Native compile, bộ cài và truyền file trên điện thoại thật vẫn chưa được xác minh. Đây là giới hạn tại thời điểm khởi tạo. Kết quả native CI mới nhất nằm trong [BUILD_STATUS.md](BUILD_STATUS.md).
 
 Stress test riêng chạy bằng `npm run test:hash:large`: so sánh browser hasher với Node crypto trên 4 GiB + 8 MiB + 3 bytes, tái sử dụng một buffer 8 MiB, không tạo file nhiều GB. Lệnh này chạy theo yêu cầu, không nằm trong test nhanh mặc định. Kết quả hash trên Node không thay thế kiểm thử upload hay RAM trên iPhone.
 
@@ -10,7 +10,7 @@ Kết quả stress: SHA-256 khớp trên 4.303.355.907 bytes, khoảng 135 giây
 Dependency/cache tạm và output build trên VPS được dọn sau kiểm thử theo yêu cầu người dùng. Khi kiểm thử tiếp từ source: chạy `npm ci`, rồi `npm run build` trước Cargo để tạo lại mobile assets.
 
 ## Luồng cơ bản
-1. Cài artifact Windows/macOS/Linux sau khi CI build thành công. Dùng thư mục test riêng có đủ dung lượng.
+1. Cài bộ cài trong private draft release Windows/macOS/Linux sau khi CI build thành công. Dùng thư mục test riêng có đủ dung lượng.
 2. Cho phép QRDrop truy cập LAN/firewall khi OS hỏi. Cùng mạng có thể bị guest/client isolation; tắt VPN hoặc chọn interface thực tế nếu địa chỉ sai.
 3. Quét QR bằng camera → browser mở → chọn file → yêu cầu gửi.
 4. **Chưa Accept:** không có file bytes được ghi. Từ chối: không được gửi, phải tạo QR mới.
@@ -35,6 +35,6 @@ File zero-byte; arbitrary extension; HEIC/DNG/MOV/ZIP từ Files; tên Unicode; 
 - Shared symlink/reparse path không thoát destination; unknown staging content không bị xóa mù.
 
 ## Backend automation
-Sau `npm run build`, chạy `cargo test --manifest-path src-tauri/Cargo.toml --no-default-features`. Integration suite dùng HTTP thật, không cần desktop/display. Source chứa kiểm tra approval/replay/no-overwrite/hash/zero-byte/origin/traversal/reject/expiry/cancel và symlink Unix. Suite phải compile/pass trước khi tin behavior.
+Sau `npm run build`, chạy `cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features`. Integration suite dùng HTTP thật, không cần desktop/display. Source chứa kiểm tra approval/replay/no-overwrite/hash/zero-byte/origin/traversal/reject/expiry/cancel và symlink Unix. Suite phải compile/pass trước khi tin behavior.
 
 Không thay phone acceptance bằng test mock. Gửi lỗi gồm OS/version, bước tái hiện, error message, kích thước/loại file và CI logs đã redact; không gửi credential.

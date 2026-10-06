@@ -2,7 +2,7 @@
 
 Nhận tệp từ iPhone/Android về máy tính qua mạng nội bộ: quét QR → chọn tệp → cho phép trên máy tính → gửi → kiểm tra SHA-256.
 
-**Trạng thái: bản triển khai ban đầu cần kiểm thử native.** TypeScript/build frontend và self-test local đã chạy. Rust compile, bộ cài và luồng điện thoại thật chưa được xác minh trong môi trường khởi tạo do mạng tải crates bị chặn. Không coi đây là bản release đã nghiệm thu.
+**Trạng thái: bản thử nghiệm native.** Source, kiểm thử HTTP thật và bộ cài được xác minh qua GitHub Actions; xem kết quả theo từng nền tảng tại [`docs/BUILD_STATUS.md`](docs/BUILD_STATUS.md). Cần kiểm thử cài đặt và truyền file bằng điện thoại/PC thật trước khi nghiệm thu sử dụng.
 
 ## Các điều cần biết
 - Điện thoại không cần cài app. File phải có sẵn cục bộ nếu không có Internet.
@@ -13,14 +13,13 @@ Nhận tệp từ iPhone/Android về máy tính qua mạng nội bộ: quét QR
 - Retry trong phiên đang chạy; không resume sau reload hoặc app restart.
 
 ## Tải bộ cài qua GitHub
-1. Giải nén source và đưa nội dung project lên repository của bạn, bao gồm `.github/workflows/build.yml`.
-2. Mở **Actions → Build QRDrop installers → Run workflow**. Workflow cũng chạy khi push main/master.
-3. Khi cả ba job thành công, tải artifact tương ứng:
-   - `qrdrop-windows-x64`: NSIS setup.exe, có WebView2 offline installer.
-   - `qrdrop-macos-arm64`: DMG cho Apple Silicon.
-   - `qrdrop-linux-x64`: AppImage/deb, baseline Ubuntu 24.04 build host.
-4. Artifact riêng `qrdrop-rust-lock-...` có `Cargo.lock` được CI resolve. Commit một bản lockfile sau run đầu thành công để pin Rust dependencies; các run sau dùng lockfile đã commit. Không chỉnh checksum bằng tay.
-5. Tag `v...` tạo **draft** GitHub Release; không tự publish public.
+Repository riêng tư: [truongminhkhanng/QRDrop](https://github.com/truongminhkhanng/QRDrop). Đăng nhập tài khoản có quyền truy cập, mở [Releases](https://github.com/truongminhkhanng/QRDrop/releases), rồi chọn draft test build đã kiểm tra trong `docs/BUILD_STATUS.md`.
+
+- Windows x64: NSIS setup.exe, có WebView2 offline installer.
+- macOS Apple Silicon: DMG ARM64.
+- Linux x64: AppImage/deb, build trên Ubuntu 24.04.
+
+Workflow chạy khi push main/master hoặc **Actions → Build QRDrop installers → Run workflow**. Build trong repository riêng tư lưu bộ cài ở draft release theo từng run; không tự publish. Actions artifacts chỉ dùng cho PR hoặc repository công khai. `package-lock.json` và `src-tauri/Cargo.lock` đã khóa dependency từ run CI thực tế; dùng `npm ci` và Cargo `--locked`, không sửa checksum bằng tay.
 
 GitHub dùng cho build/phân phối, không trung chuyển file. Người dùng bộ cài không cần Node/Rust/npm.
 
@@ -41,11 +40,11 @@ Build trực tiếp trên native host:
 
 ```bash
 # Windows
-npm run tauri -- build --bundles nsis
+npm run tauri -- build --bundles nsis -- --locked
 # macOS Apple Silicon
-npm run tauri -- build --target aarch64-apple-darwin --bundles dmg
+npm run tauri -- build --target aarch64-apple-darwin --bundles dmg -- --locked
 # Linux
-npm run tauri -- build --bundles appimage,deb
+npm run tauri -- build --bundles appimage,deb -- --locked
 ```
 
 ## Kiểm tra
@@ -54,8 +53,8 @@ npm run build
 npm run test:hash
 npm run test:codeintel
 npm run test:mobile
-cargo test --manifest-path src-tauri/Cargo.toml --no-default-features
-cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features
+cargo check --locked --manifest-path src-tauri/Cargo.toml
 ```
 
 Build mobile assets trước Cargo: Axum embed `mobile-dist` bằng `include_dir`. Các test Rust dùng listener/disk thật và Manager approval; không có auto-approve trong sản phẩm. Đọc `docs/TESTING.md` để kiểm thử trên PC/phone.
