@@ -34,18 +34,30 @@ jobs:
             const repo = context.repo;
             const SOURCE = 'f118e962e0af655e43e5f061b06cabe434ff0eec';
             const RUN_ID = 37471485522;
+            const VERSION_TARGET = context.sha;
             const check = (ok, message) => { if (!ok) throw new Error(message); };
             const { data: metadata } = await github.rest.repos.get(repo);
             check(metadata.private, 'Repository must remain private');
+            // The release tag points to the publication commit. Only documents and
+            // this publisher may differ from the successfully tested build source.
+            const sourceTree = (await github.rest.git.getTree({ ...repo, tree_sha: SOURCE, recursive: 'true' })).data;
+            const versionTree = (await github.rest.git.getTree({ ...repo, tree_sha: VERSION_TARGET, recursive: 'true' })).data;
+            check(!sourceTree.truncated && !versionTree.truncated, 'Cannot verify complete source trees');
+            const protectedBlobs = tree => new Map(tree.tree.filter(item => item.type === 'blob' && !item.path.endsWith('.md') && item.path !== '.github/workflows/release-v0.1.0.yml').map(item => [item.path, `${item.mode}:${item.sha}`]));
+            const tested = protectedBlobs(sourceTree);
+            const shipped = protectedBlobs(versionTree);
+            check(tested.size === shipped.size && [...tested].every(([path, sha]) => shipped.get(path) === sha), 'Application/config/lockfiles differ from tested build');
+            const { data: main } = await github.rest.repos.getBranch({ ...repo, branch: 'main' });
+            check(main.commit.sha === VERSION_TARGET, 'Publication commit must still be main head');
             const { data: run } = await github.rest.actions.getWorkflowRun({ ...repo, run_id: RUN_ID });
             check(run.head_sha === SOURCE && run.status === 'completed' && run.conclusion === 'success' && run.event === 'push' && run.head_branch === 'main', 'Authorized build is not successful');
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, { ...repo, run_id: RUN_ID, filter: 'latest', per_page: 100 });
             check(jobs.length === 3 && jobs.every(job => job.status === 'completed' && job.conclusion === 'success'), 'All three native jobs must succeed');
             const releases = await github.paginate(github.rest.repos.listReleases, { ...repo, per_page: 100 });
             const version = releases.find(release => release.tag_name === 'v0.1.0');
-            check(!version || version.target_commitish === SOURCE, 'Existing version belongs to another source');
+            check(!version || version.target_commitish === VERSION_TARGET, 'Existing version belongs to another publication commit');
             const release = version || releases.find(release => release.tag_name === `test-${RUN_ID}-${run.run_attempt}`);
-            check(release && release.target_commitish === SOURCE, 'Matching test release missing');
+            check(release && release.target_commitish === (version ? VERSION_TARGET : SOURCE), 'Matching test release missing');
             check(release.draft || (release.tag_name === 'v0.1.0' && release.prerelease), 'Unexpected release state');
             const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...repo, release_id: release.id, per_page: 100 });
             const expected = ['QRDrop_0.1.0_x64-setup.exe', 'QRDrop_0.1.0_aarch64.dmg', 'QRDrop_0.1.0_amd64.AppImage', 'QRDrop_0.1.0_amd64.deb'];
@@ -57,11 +69,11 @@ jobs:
             let tag;
             try { tag = (await github.rest.git.getRef({ ...repo, ref: 'tags/v0.1.0' })).data; }
             catch (error) { if (error.status !== 404) throw error; }
-            if (tag) check(tag.object.type === 'commit' && tag.object.sha === SOURCE, 'Version tag points to another source');
-            else await github.rest.git.createRef({ ...repo, ref: 'refs/tags/v0.1.0', sha: SOURCE });
+            if (tag) check(tag.object.type === 'commit' && tag.object.sha === VERSION_TARGET, 'Version tag points to another source');
+            else await github.rest.git.createRef({ ...repo, ref: 'refs/tags/v0.1.0', sha: VERSION_TARGET });
             const rows = expected.map(name => { const asset = assets.find(item => item.name === name); return `| ${name} | ${asset.size} | \`${asset.digest.slice(7)}\` |`; });
-            const body = notes + `\nSource: \`${SOURCE}\`. [Kiểm thử và build](${run.html_url}).\n\n## Mã kiểm tra SHA-256\n\n| Bộ cài | Bytes | SHA-256 |\n|---|---:|---|\n` + rows.join('\n') + '\n';
-            const { data: published } = await github.rest.repos.updateRelease({ ...repo, release_id: release.id, tag_name: 'v0.1.0', target_commitish: SOURCE, name: 'QRDrop 0.1.0 — Bản thử nghiệm', body, draft: false, prerelease: true, make_latest: 'false' });
+            const body = notes + `\nSource ứng dụng đã kiểm thử: \`${SOURCE}\`. Tag phát hành: \`${VERSION_TARGET}\` (cùng mã ứng dụng và lockfile). [Kiểm thử và build](${run.html_url}).\n\n## Mã kiểm tra SHA-256\n\n| Bộ cài | Bytes | SHA-256 |\n|---|---:|---|\n` + rows.join('\n') + '\n';
+            const { data: published } = await github.rest.repos.updateRelease({ ...repo, release_id: release.id, tag_name: 'v0.1.0', target_commitish: VERSION_TARGET, name: 'QRDrop 0.1.0 — Bản thử nghiệm', body, draft: false, prerelease: true, make_latest: 'false' });
             check(!published.draft && published.prerelease && published.tag_name === 'v0.1.0' && published.published_at, 'Publication failed');
             const after = await github.paginate(github.rest.repos.listReleaseAssets, { ...repo, release_id: release.id, per_page: 100 });
             check(after.length === assets.length && assets.every(asset => after.some(item => item.id === asset.id && item.name === asset.name && item.digest === asset.digest && item.size === asset.size)), 'Published assets changed');
