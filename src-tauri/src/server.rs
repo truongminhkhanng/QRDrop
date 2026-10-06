@@ -55,7 +55,12 @@ async fn guard(State(state): State<ServerState>, request: Request, next: Next) -
     let expected = session.address.to_string();
     if request.headers().get(header::HOST).and_then(|h| h.to_str().ok()) != Some(expected.as_str()) { return AppError::denied().into_response(); }
     let expected_origin = format!("http://{expected}");
-    let supplied_origin = request.headers().get(header::ORIGIN).and_then(|h| h.to_str().ok());
+    let mut origins = request.headers().get_all(header::ORIGIN).iter();
+    let supplied_origin = match origins.next() {
+        Some(value) => match value.to_str() { Ok(origin) => Some(origin), Err(_) => return AppError::denied().into_response() },
+        None => None,
+    };
+    if origins.next().is_some() { return AppError::denied().into_response(); }
     if supplied_origin.is_some_and(|value| value != expected_origin) || (request.method() != axum::http::Method::GET && supplied_origin != Some(expected_origin.as_str())) { return AppError::denied().into_response(); }
     if request.headers().get("sec-fetch-site").and_then(|h| h.to_str().ok()).is_some_and(|site| !matches!(site, "same-origin" | "none")) { return AppError::denied().into_response(); }
     let peer = request.extensions().get::<ConnectInfo<limited::Peer>>().map(|v| v.0.0.ip());

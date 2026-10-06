@@ -73,7 +73,8 @@ async fn rejects_bad_origin_traversal_mutated_manifest_and_rejected_sessions() {
     let token=session.inner.lock().await.join_token.clone();
     let request=json!({"token":token,"request_id":uuid::Uuid::new_v4().to_string(),"device":"browser","files":[{"name":"../escape","size":1}]});
     assert_eq!(h.request(Method::POST,"/api/connect").json(&request).send().await.expect("bad path").status(),StatusCode::BAD_REQUEST);
-    assert_eq!(h.request(Method::POST,"/api/connect").header("Origin","https://attacker.invalid").json(&request).send().await.expect("origin").status(),StatusCode::FORBIDDEN);
+    assert_eq!(h.client.post(format!("{}/api/connect",h.base)).header("Origin","https://attacker.invalid").json(&request).send().await.expect("origin").status(),StatusCode::FORBIDDEN);
+    assert_eq!(h.request(Method::POST,"/api/connect").header("Origin","https://attacker.invalid").json(&request).send().await.expect("duplicate origin").status(),StatusCode::FORBIDDEN);
     let connection=h.request_transfer(&[("safe.pdf",1)]).await;
     let attempt=connection["attempt_token"].as_str().expect("attempt");
     let changed=json!({"token":token,"request_id":uuid::Uuid::new_v4().to_string(),"device":"browser","files":[{"name":"other.pdf","size":1}]});
