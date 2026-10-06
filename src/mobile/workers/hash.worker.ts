@@ -10,6 +10,6 @@ self.onmessage = async (event: MessageEvent<HashRequest>) => {
       fileHash.update(data);
       self.postMessage({ id: request.id, digest: new Sha256().update(data).digest() });
     } else if (request.operation === 'finish') self.postMessage({ id: request.id, digest: fileHash.digest() });
-    else throw new Error('Yêu cầu hash không hợp lệ.');
-  } catch (cause) { self.postMessage({ id: request.id, error: String(cause) }); }
+    else throw new Error('Không thể kiểm tra tệp. Hãy chọn lại tệp và thử lại.');
+  } catch { self.postMessage({ id: request.id, error: 'Không đọc được tệp để kiểm tra. Kiểm tra quyền truy cập tệp và thử lại.' }); }
 };

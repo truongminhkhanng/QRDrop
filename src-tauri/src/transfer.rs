@@ -28,7 +28,7 @@ async fn file_work(session: &Session, id: &str, allow_complete: bool) -> Result<
 }
 pub async fn chunk(session: Arc<Session>, grant: &str, id: &str, start: u64, length: u64, digest: &str, mut body: Body) -> Result<u64> {
     authorize(&session, grant).await?;
-    if length == 0 || length > config::CHUNK_BYTES || !auth::valid_digest(digest) { return Err(AppError::invalid("Chunk không hợp lệ.")); }
+    if length == 0 || length > config::CHUNK_BYTES || !auth::valid_digest(digest) { return Err(AppError::invalid("Phần dữ liệu gửi không hợp lệ. Hãy gửi lại tệp.")); }
     let _permit = session.operation.clone().try_acquire_owned().map_err(|_| AppError::conflict("Một tệp khác đang được xử lý."))?;
     let work = file_work(&session, id, false).await?;
     let mut work = work.lock().await;
@@ -40,7 +40,7 @@ pub async fn chunk(session: Arc<Session>, grant: &str, id: &str, start: u64, len
             return Ok(work.offset);
         }
     }
-    if start != work.offset || start.checked_add(length).is_none_or(|end| end > work.size) { return Err(AppError::conflict(format!("Offset hợp lệ: {}", work.offset))); }
+    if start != work.offset || start.checked_add(length).is_none_or(|end| end > work.size) { return Err(AppError::conflict("Tiến trình gửi và nhận chưa khớp. Hãy thử gửi lại tệp.")); }
     if work.file.is_none() { work.file = Some(files::open_part(&session.storage, &work.id)?); }
     let file = work.file.as_mut().ok_or_else(|| AppError::conflict("Tệp đang đóng."))?;
     file.seek(SeekFrom::Start(start)).await?;
@@ -59,9 +59,9 @@ pub async fn chunk(session: Arc<Session>, grant: &str, id: &str, start: u64, len
                 value = tokio::time::timeout(Duration::from_secs(90), body.frame()) => value.map_err(|_| AppError::new(StatusCode::REQUEST_TIMEOUT, "chunk_timeout", "Kết nối bị gián đoạn. Hãy thử lại."))?,
             };
             let Some(frame) = frame else { break; };
-            let frame = frame.map_err(|_| AppError::invalid("Chunk bị gián đoạn."))?;
+            let frame = frame.map_err(|_| AppError::invalid("Dữ liệu gửi bị gián đoạn. Kiểm tra kết nối mạng và thử lại."))?;
             if let Ok(data) = frame.into_data() {
-                if received.saturating_add(data.len() as u64) > length { return Err(AppError::new(StatusCode::PAYLOAD_TOO_LARGE, "chunk_too_large", "Chunk vượt kích thước đã khai báo.")); }
+                if received.saturating_add(data.len() as u64) > length { return Err(AppError::new(StatusCode::PAYLOAD_TOO_LARGE, "chunk_too_large", "Dữ liệu gửi vượt kích thước đã khai báo. Hãy gửi lại tệp.")); }
                 tokio::select! {
                     _ = session.cancel.cancelled() => return Err(AppError::conflict("Phiên đã bị hủy.")),
                     value = file.write_all(&data) => value?,
@@ -73,8 +73,8 @@ pub async fn chunk(session: Arc<Session>, grant: &str, id: &str, start: u64, len
                 if let Some(view) = inner.files.iter_mut().find(|view| view.id == id) { view.received = start + received; }
             }
         }
-        if received != length { return Err(AppError::invalid("Chunk chưa được gửi đầy đủ.")); }
-        if !hex::encode(hash.finalize()).eq_ignore_ascii_case(digest) { return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "hash_mismatch", "Dữ liệu chunk không khớp.")); }
+        if received != length { return Err(AppError::invalid("Dữ liệu chưa được gửi đầy đủ. Kiểm tra kết nối mạng và thử lại.")); }
+        if !hex::encode(hash.finalize()).eq_ignore_ascii_case(digest) { return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "hash_mismatch", "Dữ liệu nhận được không khớp với dữ liệu gửi. Hãy gửi lại tệp.")); }
         file.flush().await?;
         Ok(())
     }.await;
@@ -112,12 +112,12 @@ async fn verify_replay(session: &Session, body: &mut Body, length: u64, expected
 }
 pub async fn start_verification(session: Arc<Session>, manager: Arc<Manager>, grant: &str, id: &str, expected: String) -> Result<()> {
     authorize(&session, grant).await?;
-    if !auth::valid_digest(&expected) { return Err(AppError::invalid("SHA-256 không hợp lệ.")); }
+    if !auth::valid_digest(&expected) { return Err(AppError::invalid("Thông tin kiểm tra tệp không hợp lệ. Hãy gửi lại tệp.")); }
     {
         let inner = session.inner.lock().await;
         if let Some(view) = inner.files.iter().find(|f| f.id == id) {
             if view.status == FileState::Complete {
-                return if view.sha256.as_ref().is_some_and(|hash| hash.eq_ignore_ascii_case(&expected)) { Ok(()) } else { Err(AppError::conflict("Tệp đã hoàn tất với hash khác.")) };
+                return if view.sha256.as_ref().is_some_and(|hash| hash.eq_ignore_ascii_case(&expected)) { Ok(()) } else { Err(AppError::conflict("Tệp đã lưu khác với dữ liệu đang gửi. Hãy tạo mã QR mới để gửi lại.")) };
             }
             if view.status == FileState::Verifying { return Ok(()); }
         }
@@ -142,7 +142,7 @@ async fn verify_file(session: &Session, manager: &Manager, work: Arc<tokio::sync
     file.flush().await?;
     file.sync_all().await?;
     let digest = hash::disk_digest(file, &session.cancel, &session.inner).await?;
-    if !digest.eq_ignore_ascii_case(expected) { return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "hash_mismatch", "Hash của tệp nhận được không khớp. Tệp chưa được lưu hoàn tất.")); }
+    if !digest.eq_ignore_ascii_case(expected) { return Err(AppError::new(StatusCode::UNPROCESSABLE_ENTITY, "hash_mismatch", "Dữ liệu nhận được không khớp với tệp đã gửi. Tệp chưa được lưu hoàn tất; hãy gửi lại.")); }
     drop(work.file.take());
     let mut inner = session.inner.lock().await;
     if inner.state.terminal() || session.cancel.is_cancelled() { return Err(AppError::denied()); }

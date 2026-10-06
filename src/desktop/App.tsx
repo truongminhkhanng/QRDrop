@@ -31,7 +31,7 @@ export function App() {
   }
   async function perform(action: () => Promise<void>) {
     setBusy(true); setError('');
-    try { await action(); } catch (cause) { setError(String(cause)); } finally { setBusy(false); }
+    try { await action(); } catch (cause) { setError(typeof cause === 'string' ? cause : 'Không thể thực hiện thao tác. Hãy thử lại hoặc mở lại QRDrop.'); } finally { setBusy(false); }
   }
   async function refresh() {
     await perform(async () => {
@@ -43,7 +43,7 @@ export function App() {
     });
   }
   useEffect(() => {
-    if (!isTauri()) { setError('Mở QRDrop bằng ứng dụng desktop để nhận tệp. Trang web này không có quyền truy cập máy tính.'); return; }
+    if (!isTauri()) { setError('Mở QRDrop bằng ứng dụng trên máy tính để nhận tệp. Trang web này không có quyền truy cập máy tính.'); return; }
     let disposed = false;
     const subscriptions: (() => void)[] = [];
     void (async () => {
@@ -63,12 +63,12 @@ export function App() {
         setDestination(config.destination); setInterfaces(networks); setRecent(history);
         const current = await invoke<Snapshot | null>('session_snapshot');
         setSession(current ?? await invoke<Snapshot>('create_session', { ip: null }));
-      } catch (cause) { if (!disposed) setError(String(cause)); }
+      } catch (cause) { if (!disposed) setError(typeof cause === 'string' ? cause : 'Không thể thực hiện thao tác. Hãy thử lại hoặc mở lại QRDrop.'); }
     })();
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => { disposed = true; subscriptions.forEach(unsubscribe => unsubscribe()); clearInterval(timer); pendingConfirmation.current?.resolve(false); pendingConfirmation.current = null; };
   }, []);
-  useEffect(() => { if (session && terminal(session.state) && isTauri()) void invoke<Recent[]>('recent_transfers').then(setRecent).catch(cause => setError(String(cause))); }, [session?.state]);
+  useEffect(() => { if (session && terminal(session.state) && isTauri()) void invoke<Recent[]>('recent_transfers').then(setRecent).catch(cause => setError(typeof cause === 'string' ? cause : 'Không thể thực hiện thao tác. Hãy thử lại hoặc mở lại QRDrop.')); }, [session?.state]);
   const total = session?.files.reduce((sum, file) => sum + file.size, 0) ?? 0;
   const received = session?.files.reduce((sum, file) => sum + file.received, 0) ?? 0;
   const seconds = session ? Math.max(0, session.expires_at - Math.floor(now / 1000)) : 0;

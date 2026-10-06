@@ -3,6 +3,9 @@ on:
   push:
     branches: [main, master]
     tags: ['v*']
+    paths-ignore:
+      - '**/*.md'
+      - '.github/workflows/release-v0.1.0.yml'
   pull_request:
   workflow_dispatch:
 
@@ -42,23 +45,11 @@ jobs:
       - name: Linux native libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-      - name: Resolve npm lockfile for matched Tauri API (bootstrap only)
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Preserve npm lockfile in build log
-        run: python -c "import base64,pathlib,zlib; data=base64.b64encode(zlib.compress(pathlib.Path('package-lock.json').read_bytes())).decode(); print('QRDROP_NPM_LOCK_BEGIN'); print('\n'.join(data[i:i+200] for i in range(0,len(data),200))); print('QRDROP_NPM_LOCK_END')"
       - run: npm ci
       - run: npm run build
       - run: npm run test:hash
       - run: npm run test:codeintel
       - run: npm run test:mobile
-      - name: Resolve Rust lockfile (initial bootstrap only)
-        shell: bash
-        run: |
-          if [ ! -f src-tauri/Cargo.lock ]; then
-            cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
-          fi
-      - name: Preserve Rust lockfile in build log
-        run: python -c "import base64,pathlib,zlib; data=base64.b64encode(zlib.compress(pathlib.Path('src-tauri/Cargo.lock').read_bytes())).decode(); print('QRDROP_LOCK_BEGIN'); print('\n'.join(data[i:i+200] for i in range(0,len(data),200))); print('QRDROP_LOCK_END')"
       - name: Test real receiver
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features
       - name: Check desktop source

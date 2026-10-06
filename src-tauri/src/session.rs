@@ -74,7 +74,7 @@ impl Manager {
     }
     // Loopback is allowed only for the headless test harness, never desktop network selection.
     pub async fn start_at(self: &Arc<Self>, address: SocketAddr, allow_loopback: bool) -> Result<DesktopSnapshot> {
-        if !matches!(address.ip(), std::net::IpAddr::V4(ip) if ip.is_private() || (allow_loopback && ip.is_loopback())) { return Err(AppError::invalid("Chỉ cho phép địa chỉ LAN IPv4.")); }
+        if !matches!(address.ip(), std::net::IpAddr::V4(ip) if ip.is_private() || (allow_loopback && ip.is_loopback())) { return Err(AppError::invalid("Hãy chọn kết nối mạng nội bộ của máy tính.")); }
         let mut current = self.current.lock().await;
         if let Some(previous) = current.as_ref() {
             if !previous.inner.lock().await.state.terminal() { return Err(AppError::conflict("Hủy phiên hiện tại trước khi tạo mã QR mới.")); }

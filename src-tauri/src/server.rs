@@ -30,8 +30,8 @@ pub fn spawn(listener: tokio::net::TcpListener, session: Arc<Session>, manager: 
     let server_session = session.clone();
     tokio::spawn(async move {
         let listener = crate::server::limited::LimitedListener::new(listener, server_session.allow_loopback);
-        if let Err(error) = axum::serve(listener, app.into_make_service_with_connect_info::<limited::Peer>()).with_graceful_shutdown(server_session.stop_server.clone().cancelled_owned()).await {
-            server_session.terminate(SessionState::Failed, Some(format!("Máy chủ nhận tệp đã dừng: {error}"))).await;
+        if axum::serve(listener, app.into_make_service_with_connect_info::<limited::Peer>()).with_graceful_shutdown(server_session.stop_server.clone().cancelled_owned()).await.is_err() {
+            server_session.terminate(SessionState::Failed, Some("Kết nối nhận tệp đã dừng. Kiểm tra mạng và tạo mã QR mới để thử lại.".to_owned())).await;
         }
     });
     tokio::spawn(async move {
@@ -104,7 +104,7 @@ async fn connect(State(state): State<ServerState>, ConnectInfo(peer): ConnectInf
         files::safe_name(&file.name)?;
         total = total.checked_add(file.size).ok_or_else(|| AppError::invalid("Dung lượng quá lớn."))?;
     }
-    if total > 9_007_199_254_740_991 { return Err(AppError::invalid("Dung lượng vượt giới hạn số nguyên của browser.")); }
+    if total > 9_007_199_254_740_991 { return Err(AppError::invalid("Tổng dung lượng tệp vượt giới hạn của trình duyệt. Hãy chọn ít tệp hơn.")); }
     let fingerprint = hex::encode(Sha256::digest(serde_json::to_vec(&request).map_err(|_| AppError::invalid("Yêu cầu không hợp lệ."))?));
     let session = &state.session;
     if session.cancel.is_cancelled() || session.expired().await { return Err(AppError::denied()); }
@@ -134,12 +134,12 @@ async fn status(State(state): State<ServerState>, headers: HeaderMap) -> Result<
     if !inner.attempt_token.as_ref().is_some_and(|expected| auth::matches(expected, token)) { return Err(AppError::denied()); }
     Ok(Json(MobileStatus { state: inner.state, grant: if inner.state.terminal() { None } else { inner.grant.clone() }, files: inner.files.clone(), error: inner.error.clone() }))
 }
-fn number(headers: &HeaderMap, key: &str) -> Result<u64> { headers.get(key).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok()).ok_or_else(|| AppError::invalid("Thiếu metadata chunk.")) }
+fn number(headers: &HeaderMap, key: &str) -> Result<u64> { headers.get(key).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok()).ok_or_else(|| AppError::invalid("Thông tin gửi tệp không đầy đủ. Quét mã QR mới để thử lại.")) }
 async fn chunk(State(state): State<ServerState>, Path(id): Path<String>, headers: HeaderMap, body: Body) -> Result<Json<ChunkReply>> {
-    if headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()) != Some("application/octet-stream") { return Err(AppError::new(StatusCode::UNSUPPORTED_MEDIA_TYPE, "content_type", "Chỉ chấp nhận binary chunk.")); }
+    if headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()) != Some("application/octet-stream") { return Err(AppError::new(StatusCode::UNSUPPORTED_MEDIA_TYPE, "content_type", "Dữ liệu gửi không đúng định dạng. Quét mã QR mới để thử lại.")); }
     let length = number(&headers, "x-qrdrop-length")?;
-    if number(&headers, "content-length")? != length { return Err(AppError::invalid("Độ dài chunk không khớp.")); }
-    let digest = headers.get("x-qrdrop-sha256").and_then(|h| h.to_str().ok()).ok_or_else(|| AppError::invalid("Thiếu SHA-256 chunk."))?;
+    if number(&headers, "content-length")? != length { return Err(AppError::invalid("Kích thước dữ liệu gửi không khớp. Hãy gửi lại tệp.")); }
+    let digest = headers.get("x-qrdrop-sha256").and_then(|h| h.to_str().ok()).ok_or_else(|| AppError::invalid("Thiếu thông tin kiểm tra tệp. Quét mã QR mới để thử lại."))?;
     let offset = match transfer::chunk(state.session.clone(), credential(&headers)?, &id, number(&headers, "x-qrdrop-offset")?, length, digest, body).await {
         Ok(offset) => offset,
         Err(error) => {

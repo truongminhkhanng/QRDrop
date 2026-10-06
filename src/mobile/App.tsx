@@ -34,8 +34,9 @@ export function App() {
     const controller = new AbortController(); operation.current = controller;
     const signal = controller.signal;
     setBusy(true); setError('');
-    const hash = new HashWorker(); worker.current = hash;
+    let hash: HashWorker | null = null;
     try {
+      hash = new HashWorker(); worker.current = hash;
       setPhase('Đang yêu cầu máy tính cho phép…');
       const id = api.requestId();
       let connection: Awaited<ReturnType<typeof api.connect>> | null = null;
@@ -65,7 +66,7 @@ export function App() {
           for (let tries = 0; !acknowledged; tries++) {
             try {
               const next = await api.upload(grant, target, offset, blob, digest, signal, count => setSent({id:target.id,bytes:offset+count}));
-              if (next !== offset + blob.size) throw new Error('Offset phản hồi không khớp.');
+              if (next !== offset + blob.size) throw new Error('Tiến trình gửi và nhận chưa khớp. Hãy thử gửi lại tệp.');
               acknowledged = true;
             } catch (cause) {
               if (signal.aborted || tries >= 8 || (cause instanceof api.HttpError && cause.status >= 400 && cause.status < 500 && ![408,409,429].includes(cause.status))) throw cause;
@@ -100,16 +101,16 @@ export function App() {
       }
       setCurrent(await api.poll(connection.attempt_token, signal)); setPhase('Đã gửi tất cả tệp · SHA-256 khớp');
     } catch (cause) {
-      setError(signal.aborted ? 'Đã hủy gửi tệp.' : cause instanceof Error ? cause.message : String(cause));
+      setError(signal.aborted ? 'Đã hủy gửi tệp.' : cause instanceof Error && !(cause instanceof DOMException || cause instanceof TypeError || cause instanceof RangeError || cause instanceof SyntaxError) ? cause.message : 'Không đọc hoặc gửi được tệp. Kiểm tra quyền truy cập tệp và quét mã QR mới để thử lại.');
       setPhase('Không thể hoàn tất');
       if (attempt.current && !signal.aborted) {
         try { const snapshot = await api.status(attempt.current); setCurrent(snapshot); if (!terminal(snapshot.state)) { await api.cancel(attempt.current); setCurrent(await api.status(attempt.current)); } } catch { /* Connection error is already displayed; server expires and cleans up. */ }
       }
-    } finally { setBusy(false); setSent(null); hash.close(); worker.current = null; }
+    } finally { setBusy(false); setSent(null); hash?.close(); worker.current = null; }
   }
   async function cancel() {
     operation.current?.abort(); worker.current?.close();
-    if (attempt.current) { try { await api.cancel(attempt.current); } catch (cause) { setError(`Đã dừng gửi. Máy tính sẽ dọn tệp tạm khi hết hạn. ${String(cause)}`); } }
+    if (attempt.current) { try { await api.cancel(attempt.current); } catch { setError('Đã dừng gửi nhưng chưa kết nối được với máy tính để hủy phiên. QRDrop sẽ dọn tệp tạm khi phiên hết hạn.'); } }
   }
   const total = files.reduce((sum, file) => sum + file.size, 0);
   const received = current?.files.reduce((sum, file) => sum + file.received, 0) ?? 0;

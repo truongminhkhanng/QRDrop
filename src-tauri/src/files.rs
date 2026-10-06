@@ -53,11 +53,11 @@ pub fn create(root: &Path, state_dir: &Path, session_id: &str) -> Result<Storage
         staging.remove_file(format!("{probe}.part"))?;
         Ok(())
     });
-    if let Err(error) = check {
-        if let Err(cleanup_error) = cleanup(&storage, &[probe, linked], state_dir) {
-            return Err(AppError::invalid(format!("Không thể lưu an toàn vào thư mục đã chọn: {error}. Không dọn được staging: {cleanup_error}")));
+    if check.is_err() {
+        if cleanup(&storage, &[probe, linked], state_dir).is_err() {
+            return Err(AppError::invalid("Không thể lưu an toàn vào thư mục đã chọn và chưa dọn được tệp tạm. Kiểm tra quyền truy cập thư mục, rồi thử lại."));
         }
-        return Err(AppError::invalid(format!("Thư mục nhận không hỗ trợ lưu an toàn hoặc không ghi được ({error}). Hãy chọn thư mục trên ổ đĩa khác.")));
+        return Err(AppError::invalid("Không thể lưu an toàn vào thư mục đã chọn. Hãy chọn thư mục trên ổ đĩa khác."));
     }
     Ok(storage)
 }
@@ -76,7 +76,7 @@ pub fn publish(storage: &Storage, id: &str, name: &str) -> Result<(String, Optio
             match staging.hard_link(format!("{id}.part"), &storage.destination, &candidate) {
                 Ok(()) => {
                     // Publication has succeeded: a cleanup error must not cause duplicate publication.
-                    let warning = staging.remove_file(format!("{id}.part")).err().map(|e| format!("Tệp đã lưu, nhưng chưa dọn được liên kết tạm: {e}"));
+                    let warning = staging.remove_file(format!("{id}.part")).err().map(|_| "Tệp đã lưu, nhưng chưa dọn được tệp tạm. Kiểm tra quyền truy cập thư mục nhận.".to_owned());
                     return Ok((candidate, warning));
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -123,7 +123,7 @@ pub fn recover(state_dir: &Path) -> Result<()> {
         let name = entry.file_name();
         let text = name.to_string_lossy();
         if !text.ends_with(".part") || uuid::Uuid::parse_str(text.trim_end_matches(".part")).is_err() || !entry.file_type()?.is_file() {
-            return Err(AppError::invalid("Có tệp không nhận diện được trong staging; cần kiểm tra thủ công."));
+            return Err(AppError::invalid("Có tệp không nhận diện được trong thư mục tạm. Hãy kiểm tra thư mục trước khi tiếp tục."));
         }
         staging.remove_file(name)?;
     }

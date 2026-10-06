@@ -14,7 +14,14 @@ impl AppError {
     pub fn invalid(message: impl Into<String>) -> Self { Self::new(StatusCode::BAD_REQUEST, "invalid_request", message) }
     pub fn denied() -> Self { Self::new(StatusCode::FORBIDDEN, "not_authorized", "Phiên chưa được cho phép hoặc quyền truy cập đã hết hạn.") }
     pub fn conflict(message: impl Into<String>) -> Self { Self::new(StatusCode::CONFLICT, "conflict", message) }
-    pub fn io(error: std::io::Error) -> Self { Self::new(StatusCode::INSUFFICIENT_STORAGE, "storage_error", format!("Không thể ghi hoặc đọc thư mục nhận: {error}")) }
+    pub fn io(error: std::io::Error) -> Self {
+        let message = match error.kind() {
+            std::io::ErrorKind::PermissionDenied => "QRDrop không có quyền truy cập thư mục. Hãy chọn thư mục khác hoặc kiểm tra quyền truy cập.",
+            std::io::ErrorKind::NotFound => "Không tìm thấy tệp hoặc thư mục cần dùng. Kiểm tra ổ đĩa và chọn lại thư mục nhận.",
+            _ => "Không thể đọc hoặc ghi dữ liệu. Kiểm tra dung lượng trống, kết nối ổ đĩa và quyền truy cập thư mục.",
+        };
+        Self::new(StatusCode::INSUFFICIENT_STORAGE, "storage_error", message)
+    }
 }
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self.message) }

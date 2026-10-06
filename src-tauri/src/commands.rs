@@ -26,9 +26,9 @@ async fn set_destination(manager: State<'_, Managed>, destination: PathBuf) -> R
 async fn recent_transfers(manager: State<'_, Managed>) -> Result<Vec<RecentTransfer>, String> { Ok(manager.recent.lock().await.clone()) }
 #[tauri::command]
 async fn choose_destination(app: tauri::AppHandle, manager: State<'_, Managed>) -> Result<Option<String>, String> {
-    let chosen = tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder()).await.map_err(|e| e.to_string())?;
+    let chosen = tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder()).await.map_err(|_| "Không mở được cửa sổ chọn thư mục. Hãy thử lại.".to_owned())?;
     if let Some(chosen) = chosen {
-        let path = chosen.into_path().map_err(|e| e.to_string())?;
+        let path = chosen.into_path().map_err(|_| "Không sử dụng được thư mục đã chọn. Hãy chọn thư mục khác.".to_owned())?;
         manager.set_destination(path.clone()).await.map_err(|e| e.to_string())?;
         Ok(Some(path.to_string_lossy().into_owned()))
     } else { Ok(None) }
@@ -36,8 +36,8 @@ async fn choose_destination(app: tauri::AppHandle, manager: State<'_, Managed>) 
 #[tauri::command]
 async fn open_destination(app: tauri::AppHandle, manager: State<'_, Managed>) -> Result<(), String> {
     let path = match manager.current.lock().await.as_ref() { Some(session) => session.storage.root.clone(), None => manager.settings.lock().await.destination.clone() };
-    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
-    app.opener().open_path(path.to_string_lossy().into_owned(), None::<&str>).map_err(|e| e.to_string())
+    std::fs::create_dir_all(&path).map_err(|e| crate::errors::AppError::io(e).to_string())?;
+    app.opener().open_path(path.to_string_lossy().into_owned(), None::<&str>).map_err(|_| "Không mở được thư mục nhận. Hãy mở thư mục bằng trình quản lý tệp trên máy tính.".to_owned())
 }
 
 pub fn run() {
