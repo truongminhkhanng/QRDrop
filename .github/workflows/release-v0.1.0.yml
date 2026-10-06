@@ -12,7 +12,7 @@ concurrency:
 jobs:
   publish:
     if: >-
-      github.repository == 'truongminhkhanng/QRDrop' &&
+      false && github.repository == 'truongminhkhanng/QRDrop' &&
       github.event.workflow_run.id == 37468085213 &&
       github.event.workflow_run.head_sha == '27c1ad2a3c091b3ac3ee8ee97e940a6571dc5e89' &&
       github.event.workflow_run.head_branch == 'main' &&
