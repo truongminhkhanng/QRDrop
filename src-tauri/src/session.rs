@@ -144,7 +144,7 @@ impl Manager {
 impl Session {
     pub async fn snapshot(&self) -> DesktopSnapshot {
         let inner = self.inner.lock().await;
-        let url = if matches!(inner.state, SessionState::Waiting | SessionState::WaitingForApproval) { format!("http://{}/connect#t={}", self.address, inner.join_token) } else { String::new() };
+        let url = if inner.state == SessionState::Waiting { format!("http://{}/connect#t={}", self.address, inner.join_token) } else { String::new() };
         let qr_svg = if url.is_empty() { String::new() } else { self.qr_svg.clone() };
         DesktopSnapshot { session_id: self.id.clone(), state: inner.state, url, qr_svg, address: self.address.to_string(), expires_at: self.created_unix + config::JOIN_SECONDS,
             device: inner.device.clone(), peer: inner.peer.clone(), files: inner.files.clone(), error: inner.error.clone(), destination: self.storage.root.to_string_lossy().into_owned() }

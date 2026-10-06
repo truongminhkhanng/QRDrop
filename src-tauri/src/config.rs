@@ -19,14 +19,14 @@ pub fn default_destination() -> Result<PathBuf> {
 pub fn load(root: &Path) -> Result<Settings> {
     let path = root.join("settings.json");
     match std::fs::read(&path) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| AppError::invalid("Settings không hợp lệ. Kiểm tra settings.json.")),
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| AppError::invalid("Không đọc được cài đặt đã lưu. Kiểm tra tệp settings.json trong thư mục dữ liệu của QRDrop.")),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Settings { destination: default_destination()? }),
         Err(e) => Err(e.into()),
     }
 }
 pub fn save(root: &Path, settings: &Settings) -> Result<()> {
     let temp = root.join("settings.new.json");
-    let bytes = serde_json::to_vec_pretty(settings).map_err(|_| AppError::invalid("Không thể lưu Settings."))?;
+    let bytes = serde_json::to_vec_pretty(settings).map_err(|_| AppError::invalid("Không thể lưu cài đặt. Hãy thử lại."))?;
     std::fs::write(&temp, bytes)?;
     std::fs::rename(temp, root.join("settings.json"))?;
     Ok(())

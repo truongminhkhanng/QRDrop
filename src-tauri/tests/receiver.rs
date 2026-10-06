@@ -229,3 +229,80 @@ fn recovery_removes_owned_partials_and_preserves_unrelated_files() {
     assert_eq!(std::fs::read(destination.join("unrelated.part")).expect("unrelated file"),b"keep");
     files::recover(&state).expect("idempotent recovery");
 }
+
+#[tokio::test]
+async fn join_token_is_consumed_once_and_identical_retry_recovers_reply() {
+    let h = Harness::new().await;
+    let session = h.manager.active().await.expect("session");
+    let token = session.inner.lock().await.join_token.clone();
+    let request = json!({"token": token, "request_id": uuid::Uuid::new_v4().to_string(), "device": "test browser", "files": [{"name": "single.txt", "size": 3}]});
+    let first = h.request(Method::POST, "/api/connect").json(&request).send().await.expect("first connect");
+    assert_eq!(first.status(), StatusCode::OK);
+    let first: Value = first.json().await.expect("reply");
+    assert!(session.inner.lock().await.join_token.is_empty());
+    let snapshot = session.snapshot().await;
+    assert!(snapshot.url.is_empty() && snapshot.qr_svg.is_empty());
+    let retry = h.request(Method::POST, "/api/connect").json(&request).send().await.expect("lost reply retry");
+    assert_eq!(retry.status(), StatusCode::OK);
+    assert_eq!(retry.json::<Value>().await.expect("retry reply"), first);
+    let mut changed = request.clone();
+    changed["request_id"] = json!(uuid::Uuid::new_v4().to_string());
+    assert_eq!(h.request(Method::POST, "/api/connect").json(&changed).send().await.expect("token reused").status(), StatusCode::FORBIDDEN);
+    assert!(!h.destination.join("single.txt").exists());
+    h.accept(first["attempt_token"].as_str().expect("attempt")).await;
+    let retry = h.request(Method::POST, "/api/connect").json(&request).send().await.expect("approved retry");
+    assert_eq!(retry.status(), StatusCode::OK);
+    assert_eq!(retry.json::<Value>().await.expect("approved reply"), first);
+    changed = request.clone();
+    changed["files"][0]["name"] = json!("changed.txt");
+    assert_eq!(h.request(Method::POST, "/api/connect").json(&changed).send().await.expect("manifest changed").status(), StatusCode::FORBIDDEN);
+    h.stop().await;
+}
+
+#[tokio::test]
+async fn invalid_input_does_not_consume_join_or_create_approval() {
+    let h = Harness::new().await;
+    let session = h.manager.active().await.expect("session");
+    let token = session.inner.lock().await.join_token.clone();
+    let request = json!({"token": token, "request_id": uuid::Uuid::new_v4().to_string(), "device": "test browser", "files": [{"name": "safe.txt", "size": 3}]});
+    let mut unknown = request.clone();
+    unknown["approved"] = json!(true);
+    assert_eq!(h.request(Method::POST, "/api/connect").json(&unknown).send().await.expect("extra field").status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let mut negative = request.clone();
+    negative["files"][0]["size"] = json!(-1);
+    assert_eq!(h.request(Method::POST, "/api/connect").json(&negative).send().await.expect("negative size").status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let mut traversal = request.clone();
+    traversal["files"][0]["name"] = json!("../escape.txt");
+    assert_eq!(h.request(Method::POST, "/api/connect").json(&traversal).send().await.expect("traversal").status(), StatusCode::BAD_REQUEST);
+    let inner = session.inner.lock().await;
+    assert_eq!(inner.state, SessionState::Waiting);
+    assert_eq!(inner.join_token, token);
+    assert!(inner.files.is_empty() && inner.attempt_token.is_none() && inner.grant.is_none());
+    drop(inner);
+    assert_eq!(h.request(Method::POST, "/api/connect").json(&request).send().await.expect("valid request").status(), StatusCode::OK);
+    h.stop().await;
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn another_peer_cannot_recover_attempt_or_use_stolen_credentials() {
+    let h = Harness::new().await;
+    let session = h.manager.active().await.expect("session");
+    let token = session.inner.lock().await.join_token.clone();
+    let request = json!({"token": token, "request_id": uuid::Uuid::new_v4().to_string(), "device": "test browser", "files": [{"name": "bound.txt", "size": 3}]});
+    let connection: Value = h.request(Method::POST, "/api/connect").json(&request).send().await.expect("connect").json().await.expect("reply");
+    let attempt = connection["attempt_token"].as_str().expect("attempt");
+    let pending = h.status(attempt).await;
+    let id = pending["files"][0]["id"].as_str().expect("id");
+    let outsider = Client::builder().local_address("127.0.0.2".parse::<std::net::IpAddr>().expect("other source")).build().expect("other client");
+    assert_eq!(outsider.post(format!("{}/api/connect", h.base)).header("Origin", &h.base).json(&request).send().await.expect("other connect").status(), StatusCode::FORBIDDEN);
+    assert_eq!(outsider.get(format!("{}/api/status", h.base)).header("Origin", &h.base).bearer_auth(attempt).send().await.expect("other status").status(), StatusCode::FORBIDDEN);
+    let approved = h.accept(attempt).await;
+    let grant = approved["grant"].as_str().expect("grant");
+    assert_eq!(outsider.put(format!("{}/api/files/{id}/chunks", h.base)).header("Origin", &h.base).bearer_auth(grant).header("content-type", "application/octet-stream").header("x-qrdrop-offset", 0).header("x-qrdrop-length", 3).header("x-qrdrop-sha256", hex::encode(Sha256::digest(b"abc"))).body(b"abc".to_vec()).send().await.expect("other chunk").status(), StatusCode::FORBIDDEN);
+    assert_eq!(outsider.post(format!("{}/api/cancel", h.base)).header("Origin", &h.base).bearer_auth(attempt).json(&json!({})).send().await.expect("other cancel").status(), StatusCode::FORBIDDEN);
+    assert_eq!(h.status(attempt).await["state"], "APPROVED");
+    assert!(!h.destination.join("bound.txt").exists());
+    assert_eq!(h.chunk(grant, id, 0, b"abc").await.status(), StatusCode::OK);
+    h.stop().await;
+}

@@ -65,6 +65,10 @@ async fn guard(State(state): State<ServerState>, request: Request, next: Next) -
     if request.headers().get("sec-fetch-site").and_then(|h| h.to_str().ok()).is_some_and(|site| !matches!(site, "same-origin" | "none")) { return AppError::denied().into_response(); }
     let peer = request.extensions().get::<ConnectInfo<limited::Peer>>().map(|v| v.0.0.ip());
     if !peer.is_some_and(|ip| matches!(ip, std::net::IpAddr::V4(v4) if v4.is_private() || (session.allow_loopback && v4.is_loopback()))) { return AppError::denied().into_response(); }
+    if request.uri().path().starts_with("/api/") {
+        let inner = session.inner.lock().await;
+        if inner.peer.as_ref().is_some_and(|selected| peer.is_none_or(|ip| selected != &ip.to_string())) { return AppError::denied().into_response(); }
+    }
     if request.uri().path() == "/api/connect" {
         let mut rate = session.rate.lock().await;
         rate.retain(|_, (at, _)| at.elapsed() < Duration::from_secs(60));
@@ -109,6 +113,9 @@ async fn connect(State(state): State<ServerState>, ConnectInfo(peer): ConnectInf
     let session = &state.session;
     if session.cancel.is_cancelled() || session.expired().await { return Err(AppError::denied()); }
     let mut inner = session.inner.lock().await;
+    // Check again under the same lock that consumes the join token, including
+    // concurrent requests that passed the middleware before a sender was selected.
+    if inner.peer.as_ref().is_some_and(|selected| selected != &peer.0.ip().to_string()) { return Err(AppError::denied()); }
     if !inner.state.terminal() && inner.request_fingerprint.as_deref() == Some(fingerprint.as_str()) {
         return Ok(Json(ConnectReply { attempt_token: inner.attempt_token.clone().ok_or_else(AppError::denied)?, session_id: session.id.clone(), chunk_bytes: config::CHUNK_BYTES }));
     }
@@ -125,6 +132,9 @@ async fn connect(State(state): State<ServerState>, ConnectInfo(peer): ConnectInf
     inner.peer = Some(peer.0.ip().to_string());
     inner.attempt_token = Some(attempt.clone());
     inner.request_fingerprint = Some(fingerprint);
+    // Only an identical retry from this sender may recover the original reply.
+    // The QR token can never create another request or change the approved files.
+    inner.join_token.clear();
     inner.state = SessionState::WaitingForApproval;
     Ok(Json(ConnectReply { attempt_token: attempt, session_id: session.id.clone(), chunk_bytes: config::CHUNK_BYTES }))
 }
