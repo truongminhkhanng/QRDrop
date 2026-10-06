@@ -1,0 +1,58 @@
+[package]
+name = "qrdrop"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+default-run = "qrdrop"
+
+[lib]
+name = "qrdrop_lib"
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "qrdrop"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[[bin]]
+name = "qrdrop-server"
+path = "src/bin/server.rs"
+
+[features]
+default = ["desktop"]
+desktop = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-dialog", "dep:tauri-plugin-opener"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [], optional = true }
+
+[dependencies]
+axum = { version = "0.8", features = ["json", "tokio", "http1"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+getrandom = "0.3"
+uuid = { version = "1", features = ["v4", "serde"] }
+if-addrs = "0.14"
+dirs = "6"
+fs2 = "0.4"
+cap-std = "3"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+include_dir = "0.7"
+mime_guess = "2"
+http-body-util = "0.1"
+subtle = "2"
+tauri = { version = "2", features = [], optional = true }
+tauri-plugin-dialog = { version = "2", optional = true }
+tauri-plugin-opener = { version = "2", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream"] }
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1

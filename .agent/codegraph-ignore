@@ -1,0 +1,17 @@
+node_modules/**
+dist/**
+mobile-dist/**
+src-tauri/target/**
+src-tauri/gen/**
+.git/**
+.agents/**
+.codex/**
+.aws/**
+.agent/**
+HISTORY/**
+.env*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*lock*

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+mobile-dist/
+src-tauri/target/
+src-tauri/gen/
+.agent/*.sqlite*
+.agent/codegraph-state.json
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.DS_Store
+artifacts/

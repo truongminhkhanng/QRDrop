@@ -1,0 +1,6 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop", "description": "Local desktop window only; no remote origins.",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:window:allow-destroy"]
+}
