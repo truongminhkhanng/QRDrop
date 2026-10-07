@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { NetworkInterface, Recent, Snapshot } from '../types';
+import type { NetworkInterface, Recent, Snapshot, TrustedDevice } from '../types';
 import { terminal } from '../types';
 import { bytes, fileLabels, sessionLabels } from '../utils/format';
 
@@ -17,8 +17,11 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [remember, setRemember] = useState(false);
+  const [trusted, setTrusted] = useState<TrustedDevice[]>([]);
   const activeSession = useRef<string | null>(null);
   const pendingConfirmation = useRef<{promise: Promise<boolean>; resolve: (answer: boolean) => void} | null>(null);
+  useEffect(() => setRemember(false), [session?.session_id]);
   function ask(message: string): Promise<boolean> {
     if (pendingConfirmation.current) return pendingConfirmation.current.promise;
     let resolve!: (answer: boolean) => void;
@@ -73,7 +76,10 @@ export function App() {
     const subscriptions: (() => void)[] = [];
     void (async () => {
       try {
-        const unlisten = await listen<Snapshot>('qrdrop:session', event => { if (!disposed && activeSession.current === event.payload.session_id) setSession(event.payload); });
+        const unlisten = await listen<Snapshot>('qrdrop:session', event => {
+          if (disposed || !activeSession.current) return;
+          if (activeSession.current === event.payload.session_id || activeSession.current === event.payload.replaces_session_id) showSession(event.payload);
+        });
         if (disposed) unlisten(); else subscriptions.push(unlisten);
         const unclose = await getCurrentWindow().onCloseRequested(async event => {
           const active = await invoke<Snapshot | null>('session_snapshot');
@@ -83,9 +89,9 @@ export function App() {
           }
         });
         if (disposed) unclose(); else subscriptions.push(unclose);
-        const [config, networks, history] = await Promise.all([invoke<{destination: string}>('get_settings'), invoke<NetworkInterface[]>('network_interfaces'), invoke<Recent[]>('recent_transfers')]);
+        const [config, networks, history, devices] = await Promise.all([invoke<{destination: string}>('get_settings'), invoke<NetworkInterface[]>('network_interfaces'), invoke<Recent[]>('recent_transfers'), invoke<TrustedDevice[]>('trusted_devices')]);
         if (disposed) return;
-        setDestination(config.destination); setInterfaces(networks); setRecent(history);
+        setDestination(config.destination); setInterfaces(networks); setRecent(history); setTrusted(devices);
         const current = await invoke<Snapshot | null>('session_snapshot');
         if (!disposed) showSession(current);
       } catch (cause) { if (!disposed) setError(typeof cause === 'string' ? cause : 'Không thể thực hiện thao tác. Hãy thử lại hoặc mở lại QRDrop.'); }
@@ -97,9 +103,10 @@ export function App() {
   const total = session?.files.reduce((sum, file) => sum + file.size, 0) ?? 0;
   const received = session?.files.reduce((sum, file) => sum + file.received, 0) ?? 0;
   const seconds = session ? Math.max(0, session.expires_at - Math.floor(now / 1000)) : 0;
+  const approvalSeconds = session?.approval_expires_at ? Math.max(0, Math.ceil(session.approval_expires_at - now / 1000)) : 0;
   const receiving = session !== null && !terminal(session.state);
   return <main className="desktop-shell">
-    <header className="brand"><span className="brand-mark">Q</span><div><h1>QRDrop</h1><p>Tệp của bạn. Đi thẳng đến máy tính.</p></div><span className="local-badge">Mạng nội bộ</span></header>
+    <header className="brand"><span className="brand-mark">Q</span><div><h1>QRDrop</h1><p>Tệp của bạn. Đi thẳng đến máy tính.</p></div><span className="local-badge">{session?.transport === 'internet' ? 'Internet · HTTPS' : 'Mạng nội bộ'}</span></header>
     <section className="receive-area" aria-live="polite">
       <h2>{session ? sessionLabels[session.state] : 'Đang tắt nhận tệp'}</h2>
       {session?.url && session.state === 'WAITING' ? <>
@@ -107,6 +114,7 @@ export function App() {
         <p>Quét mã bằng camera điện thoại</p><p className="muted">Mã có hiệu lực {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</p>
       </> : session?.state === 'COMPLETED' ? <div className="success-mark" aria-hidden="true">✓</div> : !session?.files.length ? <div className="empty-symbol" aria-hidden="true">↗</div> : null}
       {session && <p className="address">{session.address}</p>}
+      {session?.trusted_device_name && <p className="muted">Thiết bị tin cậy: {session.trusted_device_name}</p>}
       {!session && <p className="muted">Bật nhận tệp để tạo mã QR kết nối điện thoại.</p>}
       <p className="destination">Lưu vào: {(session?.destination ?? destination) || 'Chưa chọn thư mục'}</p>
     </section>
@@ -118,10 +126,10 @@ export function App() {
       {!terminal(session.state) && <button className="text-button danger" disabled={busy} onClick={() => void perform(async () => { if (await ask('Hủy phiên nhận tệp hiện tại?')) await invoke('cancel_session'); })}>Hủy nhận tệp</button>}
     </section>}
     {!session?.files.length && <section className="transfers"><h2>Đã nhận gần đây</h2>{recent.length ? <ul className="file-list">{recent.slice(0,5).map((item, i) => <li key={`${item.completed_at}-${i}`}><div><strong>{item.name}</strong><small>{bytes(item.size)} · SHA-256 khớp</small></div><span className="complete-tick">✓</span></li>)}</ul> : <p className="muted">Tệp nhận thành công sẽ xuất hiện ở đây.</p>}</section>}
-    <p className="network-note">Kết nối HTTP không mã hóa. Chỉ dùng trên mạng bạn tin cậy.</p>
+    <p className="network-note">{session?.transport === 'internet' ? 'Kết nối HTTPS qua máy chủ trung chuyển.' : 'Kết nối HTTP không mã hóa. Chỉ dùng trên mạng bạn tin cậy.'}</p>
     <footer><button className={receiving ? 'danger' : 'primary'} aria-pressed={receiving} disabled={busy || !isTauri()} onClick={() => void toggleReceiving()}>{receiving ? 'Tắt nhận tệp' : 'Bật nhận tệp'}</button><button disabled={busy || !isTauri() || !receiving} onClick={() => void refresh()}>Làm mới QR</button><button disabled={busy || !isTauri()} onClick={() => void perform(async () => { await invoke('open_destination'); })}>Mở thư mục</button><button disabled={busy || !isTauri()} onClick={() => setSettings(true)}>Cài đặt</button></footer>
-    {session?.state === 'WAITING_FOR_APPROVAL' && <div className="dialog-backdrop"><section className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="approval-title"><p className="eyebrow">Yêu cầu gửi tệp</p><h2 id="approval-title">Cho phép nhận các tệp này?</h2><p>{session.device}</p><p className="muted">Địa chỉ: {session.peer}</p><p className="approval-total">{session.files.length} tệp · {bytes(total)}</p><details><summary>Xem danh sách tệp</summary><ul className="approval-files">{session.files.map(file => <li key={file.id}>{file.name} · {bytes(file.size)}</li>)}</ul></details><p className="destination">Thư mục: {session.destination}</p><div className="dialog-actions"><button disabled={busy} onClick={() => void perform(async () => { await invoke('decide_transfer', { sessionId: session.session_id, accept: false }); })}>Từ chối</button><button className="primary" disabled={busy} onClick={() => void perform(async () => { await invoke('decide_transfer', { sessionId: session.session_id, accept: true }); })}>Cho phép</button></div></section></div>}
-    {settings && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><h2 id="settings-title">Cài đặt</h2><label>Thư mục nhận</label><p className="destination">{destination}</p><button disabled={busy} onClick={() => void perform(async () => { const chosen = await invoke<string | null>('choose_destination'); if (chosen) setDestination(chosen); })}>Chọn thư mục</button><p className="muted">Áp dụng cho phiên nhận tiếp theo.</p><label htmlFor="network">Kết nối mạng</label><select id="network" value={ip} onChange={event => setIp(event.target.value)}><option value="">Tự động chọn</option>{interfaces.map(item => <option key={item.ip} value={item.ip}>{item.name} · {item.ip}</option>)}</select><button className="text-button" onClick={() => void perform(async () => { setInterfaces(await invoke('network_interfaces')); })}>Kiểm tra lại mạng</button><p className="muted">Thay đổi mạng áp dụng khi tạo mã QR mới.</p><div className="dialog-actions"><button className="primary" onClick={() => setSettings(false)}>Xong</button></div></section></div>}
+    {session?.state === 'WAITING_FOR_APPROVAL' && <div className="dialog-backdrop"><section className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="approval-title"><p className="eyebrow">Yêu cầu gửi tệp</p><h2 id="approval-title">Cho phép nhận các tệp này?</h2><p>{session.device}</p><p className="muted">Địa chỉ: {session.peer}</p><p className="approval-total">{session.files.length} tệp · {bytes(total)}</p><p role="status">Còn {approvalSeconds} giây để xác nhận. Hết hạn sẽ tạo mã QR mới.</p><details><summary>Xem danh sách tệp</summary><ul className="approval-files">{session.files.map(file => <li key={file.id}>{file.name} · {bytes(file.size)}</li>)}</ul></details><p className="destination">Thư mục: {session.destination}</p>{session.trust_available && <label><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} /> Tin cậy trình duyệt này cho những lần gửi sau</label>}<div className="dialog-actions"><button disabled={busy} onClick={() => void perform(async () => { await invoke('decide_transfer', { sessionId: session.session_id, accept: false }); })}>Từ chối</button><button className="primary" disabled={busy || approvalSeconds === 0} onClick={() => void perform(async () => { await invoke('decide_transfer', { sessionId: session.session_id, accept: true, remember }); setTrusted(await invoke<TrustedDevice[]>('trusted_devices')); })}>Cho phép</button></div></section></div>}
+    {settings && <div className="dialog-backdrop"><section className="dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><h2 id="settings-title">Cài đặt</h2><label>Thư mục nhận</label><p className="destination">{destination}</p><button disabled={busy} onClick={() => void perform(async () => { const chosen = await invoke<string | null>('choose_destination'); if (chosen) setDestination(chosen); })}>Chọn thư mục</button><p className="muted">Áp dụng cho phiên nhận tiếp theo.</p><label htmlFor="network">Kết nối mạng</label><select id="network" value={ip} onChange={event => setIp(event.target.value)}><option value="">Tự động chọn</option>{interfaces.map(item => <option key={item.ip} value={item.ip}>{item.name} · {item.ip}</option>)}</select><button className="text-button" onClick={() => void perform(async () => { setInterfaces(await invoke('network_interfaces')); })}>Kiểm tra lại mạng</button><p className="muted">Tự động kết nối qua Internet. Chọn địa chỉ mạng để dùng nội bộ.</p><h3>Thiết bị tin cậy</h3><p className="muted">Thiết bị trong danh sách được nhận tự động khi nhận tệp đang bật. Đổi trình duyệt hoặc xóa dữ liệu trình duyệt cần ghép đôi lại.</p>{trusted.length ? <ul className="file-list">{trusted.map(device => <li key={device.id}><strong>{device.name}</strong><button disabled={busy} onClick={() => void perform(async () => { if (!await ask('Thu hồi quyền nhận tự động của thiết bị này?')) return; await invoke('forget_trusted_device', { deviceId: device.id }); setTrusted(await invoke<TrustedDevice[]>('trusted_devices')); showSession(await invoke<Snapshot | null>('session_snapshot')); })}>Xóa quyền tin cậy</button></li>)}</ul> : <p className="muted">Chưa có thiết bị tin cậy.</p>}<div className="dialog-actions"><button className="primary" onClick={() => setSettings(false)}>Xong</button></div></section></div>}
     {confirmation && <div className="dialog-backdrop"><section className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title"><h2 id="confirmation-title">Xác nhận</h2><p>{confirmation}</p><div className="dialog-actions"><button onClick={() => respond(false)}>Quay lại</button><button className="primary" onClick={() => respond(true)}>Tiếp tục</button></div></section></div>}
   </main>;
 }

@@ -24,8 +24,8 @@ pub fn router(state: ServerState) -> Router {
         .layer(middleware::from_fn_with_state(state.clone(), guard))
         .with_state(state)
 }
-pub async fn spawn(listener: tokio::net::TcpListener, session: Arc<Session>, manager: Arc<Manager>) {
-    let state = ServerState { session: session.clone(), manager };
+pub fn spawn(listener: tokio::net::TcpListener, session: Arc<Session>, manager: Arc<Manager>) {
+    let state = ServerState { session: session.clone(), manager: manager.clone() };
     let app = router(state);
     let server_session = session.clone();
     let task = tokio::spawn(async move {
@@ -34,10 +34,19 @@ pub async fn spawn(listener: tokio::net::TcpListener, session: Arc<Session>, man
             server_session.terminate(SessionState::Failed, Some("Kết nối nhận tệp đã dừng. Kiểm tra mạng và tạo mã QR mới để thử lại.".to_owned())).await;
         }
     });
-    *session.server_task.lock().await = Some(task);
+    // A session has not been published when its serving task is installed.
+    *session.server_task.try_lock().expect("new session server task lock") = Some(task);
+    watch(session, manager);
+}
+pub(crate) fn watch(session: Arc<Session>, manager: Arc<Manager>) {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(1)).await;
+            match manager.renew_expired_request(&session.id).await {
+                Ok(true) => break,
+                Ok(false) => {},
+                Err(error) => { session.inner.lock().await.error = Some(error.message); }
+            }
             if session.expired().await { session.terminate(SessionState::Expired, Some("Phiên đã hết hạn do không có tiến triển. Quét mã QR mới để thử lại.".to_owned())).await; }
             let terminal = session.inner.lock().await.state.terminal();
             if terminal {
@@ -53,9 +62,9 @@ pub async fn spawn(listener: tokio::net::TcpListener, session: Arc<Session>, man
 }
 async fn guard(State(state): State<ServerState>, request: Request, next: Next) -> Response {
     let session = &state.session;
-    let expected = session.address.to_string();
-    if request.headers().get(header::HOST).and_then(|h| h.to_str().ok()) != Some(expected.as_str()) { return AppError::denied().into_response(); }
-    let expected_origin = format!("http://{expected}");
+    let expected_origin = session.relay.as_ref().map_or_else(|| format!("http://{}", session.address), |relay| relay.origin.clone());
+    let expected = expected_origin.split_once("://").map(|(_, host)| host).unwrap_or_default();
+    if request.headers().get(header::HOST).and_then(|h| h.to_str().ok()) != Some(expected) { return AppError::denied().into_response(); }
     let mut origins = request.headers().get_all(header::ORIGIN).iter();
     let supplied_origin = match origins.next() {
         Some(value) => match value.to_str() { Ok(origin) => Some(origin), Err(_) => return AppError::denied().into_response() },
@@ -65,8 +74,8 @@ async fn guard(State(state): State<ServerState>, request: Request, next: Next) -
     if supplied_origin.is_some_and(|value| value != expected_origin) || (request.method() != axum::http::Method::GET && supplied_origin != Some(expected_origin.as_str())) { return AppError::denied().into_response(); }
     if request.headers().get("sec-fetch-site").and_then(|h| h.to_str().ok()).is_some_and(|site| !matches!(site, "same-origin" | "none")) { return AppError::denied().into_response(); }
     let peer = request.extensions().get::<ConnectInfo<limited::Peer>>().map(|v| v.0.0.ip());
-    if !peer.is_some_and(|ip| matches!(ip, std::net::IpAddr::V4(v4) if v4.is_private() || (session.allow_loopback && v4.is_loopback()))) { return AppError::denied().into_response(); }
-    if request.uri().path().starts_with("/api/") {
+    if !peer.is_some_and(|ip| session.relay.is_some() || matches!(ip, std::net::IpAddr::V4(v4) if v4.is_private() || (session.allow_loopback && v4.is_loopback()))) { return AppError::denied().into_response(); }
+    if session.relay.is_none() && request.uri().path().starts_with("/api/") {
         let inner = session.inner.lock().await;
         if inner.peer.as_ref().is_some_and(|selected| peer.is_none_or(|ip| selected != &ip.to_string())) { return AppError::denied().into_response(); }
     }
@@ -104,6 +113,8 @@ fn credential(headers: &HeaderMap) -> Result<&str> {
 }
 async fn connect(State(state): State<ServerState>, ConnectInfo(peer): ConnectInfo<limited::Peer>, Json(request): Json<ConnectRequest>) -> Result<Json<ConnectReply>> {
     if request.token.len() != 64 || request.device.len() > 128 || uuid::Uuid::parse_str(&request.request_id).is_err() || request.files.is_empty() || request.files.len() > config::MAX_FILES { return Err(AppError::invalid("Danh sách tệp hoặc yêu cầu kết nối không hợp lệ.")); }
+    if request.trusted_device_token.as_ref().is_some_and(|token| token.len() != 64 || !auth::valid_digest(token)) { return Err(AppError::invalid("Thông tin thiết bị không hợp lệ.")); }
+    let trusted_device_token = request.trusted_device_token.clone();
     let mut total = 0u64;
     for file in &request.files {
         files::safe_name(&file.name)?;
@@ -114,9 +125,10 @@ async fn connect(State(state): State<ServerState>, ConnectInfo(peer): ConnectInf
     let session = &state.session;
     if session.cancel.is_cancelled() || session.expired().await { return Err(AppError::denied()); }
     let mut inner = session.inner.lock().await;
+    if session.cancel.is_cancelled() || session.expired_inner(&inner) { return Err(AppError::denied()); }
     // Check again under the same lock that consumes the join token, including
     // concurrent requests that passed the middleware before a sender was selected.
-    if inner.peer.as_ref().is_some_and(|selected| selected != &peer.0.ip().to_string()) { return Err(AppError::denied()); }
+    if session.relay.is_none() && inner.peer.as_ref().is_some_and(|selected| selected != &peer.0.ip().to_string()) { return Err(AppError::denied()); }
     if !inner.state.terminal() && inner.request_fingerprint.as_deref() == Some(fingerprint.as_str()) {
         return Ok(Json(ConnectReply { attempt_token: inner.attempt_token.clone().ok_or_else(AppError::denied)?, session_id: session.id.clone(), chunk_bytes: config::CHUNK_BYTES }));
     }
@@ -133,17 +145,20 @@ async fn connect(State(state): State<ServerState>, ConnectInfo(peer): ConnectInf
     inner.peer = Some(peer.0.ip().to_string());
     inner.attempt_token = Some(attempt.clone());
     inner.request_fingerprint = Some(fingerprint);
+    inner.requested_at = Some(Instant::now());
+    inner.requested_unix = Some(crate::session::unix_now());
     // Only an identical retry from this sender may recover the original reply.
     // The QR token can never create another request or change the approved files.
     inner.join_token.clear();
     inner.state = SessionState::WaitingForApproval;
+    state.manager.approve_trusted(session, &mut inner, trusted_device_token.as_deref()).await?;
     Ok(Json(ConnectReply { attempt_token: attempt, session_id: session.id.clone(), chunk_bytes: config::CHUNK_BYTES }))
 }
 async fn status(State(state): State<ServerState>, headers: HeaderMap) -> Result<Json<MobileStatus>> {
     let token = credential(&headers)?;
     let inner = state.session.inner.lock().await;
     if !inner.attempt_token.as_ref().is_some_and(|expected| auth::matches(expected, token)) { return Err(AppError::denied()); }
-    Ok(Json(MobileStatus { state: inner.state, grant: if inner.state.terminal() { None } else { inner.grant.clone() }, files: inner.files.clone(), error: inner.error.clone() }))
+    Ok(Json(MobileStatus { state: inner.state, grant: if inner.state.terminal() { None } else { inner.grant.clone() }, files: inner.files.clone(), error: inner.error.clone(), paired_device_token: if inner.state.terminal() { None } else { inner.paired_device_token.clone() } }))
 }
 fn number(headers: &HeaderMap, key: &str) -> Result<u64> { headers.get(key).and_then(|h| h.to_str().ok()).and_then(|s| s.parse().ok()).ok_or_else(|| AppError::invalid("Thông tin gửi tệp không đầy đủ. Quét mã QR mới để thử lại.")) }
 async fn chunk(State(state): State<ServerState>, Path(id): Path<String>, headers: HeaderMap, body: Body) -> Result<Json<ChunkReply>> {
@@ -173,7 +188,7 @@ async fn cancel(State(state): State<ServerState>, headers: HeaderMap) -> Result<
     Ok(StatusCode::OK)
 }
 
-mod limited {
+pub(crate) mod limited {
     use std::{future::Future, io, net::SocketAddr, pin::Pin, sync::Arc, task::{Context, Poll}, time::Duration};
     use tokio::{io::{AsyncRead, AsyncWrite, ReadBuf}, net::{TcpListener, TcpStream}, sync::{OwnedSemaphorePermit, Semaphore}, time::{sleep, Sleep}};
     pub struct LimitedListener { listener: TcpListener, slots: Arc<Semaphore>, allow_loopback: bool }

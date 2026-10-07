@@ -17,7 +17,11 @@ async fn cancel_session(manager: State<'_, Managed>) -> Result<(), String> { man
 #[tauri::command]
 async fn stop_receiving(manager: State<'_, Managed>) -> Result<(), String> { manager.stop_receiving().await.map_err(|e| e.to_string()) }
 #[tauri::command]
-async fn decide_transfer(manager: State<'_, Managed>, session_id: String, accept: bool) -> Result<(), String> { manager.decide(&session_id, accept).await.map_err(|e| e.to_string()) }
+async fn decide_transfer(manager: State<'_, Managed>, session_id: String, accept: bool, remember: Option<bool>) -> Result<(), String> { manager.decide_with_trust(&session_id, accept, remember.unwrap_or(false)).await.map_err(|e| e.to_string()) }
+#[tauri::command]
+async fn trusted_devices(manager: State<'_, Managed>) -> Result<Vec<crate::trust::TrustedDevice>, String> { Ok(manager.trusted.lock().await.list()) }
+#[tauri::command]
+async fn forget_trusted_device(manager: State<'_, Managed>, device_id: String) -> Result<(), String> { manager.forget_trusted_device(&device_id).await.map_err(|e| e.to_string()) }
 #[tauri::command]
 fn network_interfaces() -> Result<Vec<NetworkInterface>, String> { network::interfaces().map_err(|e| e.to_string()) }
 #[tauri::command]
@@ -60,7 +64,7 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![create_session, session_snapshot, cancel_session, stop_receiving, decide_transfer, network_interfaces, get_settings, set_destination, recent_transfers, choose_destination, open_destination])
+        .invoke_handler(tauri::generate_handler![create_session, session_snapshot, cancel_session, stop_receiving, decide_transfer, trusted_devices, forget_trusted_device, network_interfaces, get_settings, set_destination, recent_transfers, choose_destination, open_destination])
         .build(tauri::generate_context!());
     match result {
         Ok(app) => app.run(|handle, event| {

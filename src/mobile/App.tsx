@@ -129,6 +129,6 @@ export function App() {
     {busy && <button className="text-button danger" onClick={() => void cancel()}>Hủy gửi</button>}
     {(error || current?.error) && <p className="error" role="alert">{error || current?.error}</p>}
     {current && terminal(current.state) && current.state !== 'COMPLETED' && <p>Để gửi lại, tạo mã QR mới trên máy tính.</p>}
-    <aside className="mobile-advice"><p>Giữ trang này mở và màn hình hoạt động trong lúc gửi.</p><p>QRDrop giữ nguyên dữ liệu tệp mà trình duyệt cung cấp. Tệp từ Photos có thể khác tài nguyên gốc.</p><p>Kết nối HTTP không mã hóa. Chỉ dùng trên mạng bạn tin cậy.</p></aside>
+    <aside className="mobile-advice"><p>Giữ trang này mở và màn hình hoạt động trong lúc gửi.</p><p>QRDrop giữ nguyên dữ liệu tệp mà trình duyệt cung cấp. Tệp từ Photos có thể khác tài nguyên gốc.</p><p>{location.protocol === 'https:' ? 'Kết nối HTTPS qua máy chủ trung chuyển.' : 'Kết nối HTTP không mã hóa. Chỉ dùng trên mạng bạn tin cậy.'}</p></aside>
   </main>;
 }

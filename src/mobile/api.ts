@@ -1,25 +1,49 @@
 import type { MobileStatus, TransferFile } from '../types';
 import { terminal } from '../types';
 export class HttpError extends Error { constructor(message: string, public status: number) { super(message); } }
+export function apiPath(path: string): string {
+  const prefix = typeof location !== 'undefined' ? /^\/s\/[a-f0-9]{64}(?=\/)/.exec(location.pathname)?.[0] ?? '' : '';
+  return prefix + path;
+}
+let pairingKey: string | null = null;
+async function browserCredential(signal: AbortSignal): Promise<string | null> {
+  pairingKey = null;
+  if (typeof location === 'undefined' || location.protocol !== 'https:' || !apiPath('/identity').startsWith('/s/')) return null;
+  // Read identity from the relay itself, never from a QR fragment or from a PC.
+  const identity: unknown = await (await request('/identity', null, undefined, signal)).json();
+  if (!identity || typeof identity !== 'object' || !('receiver_id' in identity) || !('namespace' in identity) || typeof identity.receiver_id !== 'string' || typeof identity.namespace !== 'string' || !/^[a-f0-9-]{36}$/.test(identity.receiver_id) || !/^[a-f0-9-]{36}$/.test(identity.namespace)) throw new Error('Không xác minh được máy tính nhận. Quét mã QR mới.');
+  pairingKey = `qrdrop:trusted:${identity.namespace}:${identity.receiver_id}`;
+  try { const token = localStorage.getItem(pairingKey); return token && /^[a-f0-9]{64}$/.test(token) ? token : null; }
+  catch { return null; }
+}
+function rememberPairing(token: string | null | undefined) {
+  if (!pairingKey || !token || !/^[a-f0-9]{64}$/.test(token)) return;
+  try { if (localStorage.getItem(pairingKey) !== token) localStorage.setItem(pairingKey, token); }
+  catch { /* Browser storage is optional; transfers still require fresh approval. */ }
+}
 function message(data: unknown): string {
   return typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string' ? data.message : 'Không thể xử lý yêu cầu. Hãy thử lại.';
 }
 async function request(path: string, token: string | null, body?: unknown, signal?: AbortSignal): Promise<Response> {
   let response: Response;
-  try { response = await fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal,
+  try { response = await fetch(apiPath(path), { method: body === undefined ? 'GET' : 'POST', cache: 'no-store', signal,
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body) }); }
-  catch (cause) { if (signal?.aborted) throw cause; throw new HttpError('Không kết nối được với máy tính. Kiểm tra Wi-Fi và giữ QRDrop mở.', 0); }
+  catch (cause) { if (signal?.aborted) throw cause; throw new HttpError('Không kết nối được với máy tính. Kiểm tra kết nối mạng và giữ QRDrop mở.', 0); }
   if (!response.ok) { const data: unknown = await response.json().catch(() => null); throw new HttpError(message(data), response.status); }
   return response;
 }
 export async function connect(token: string, requestId: string, files: File[], signal: AbortSignal): Promise<{ attempt_token: string; chunk_bytes: number }> {
   const ua = navigator.userAgent;
   const device = /iPhone|iPad/.test(ua) ? 'iPhone/iPad · Safari hoặc trình duyệt tương thích' : /Android/.test(ua) ? 'Android · Trình duyệt web' : 'Trình duyệt web';
-  const response = await request('/api/connect', null, { token, request_id: requestId, device, files: files.map(file => ({ name: file.name, size: file.size })) }, signal);
+  const trusted = await browserCredential(signal);
+  const response = await request('/api/connect', null, { token, request_id: requestId, device, files: files.map(file => ({ name: file.name, size: file.size })), ...(trusted ? { trusted_device_token: trusted } : {}) }, signal);
   return response.json() as Promise<{ attempt_token: string; chunk_bytes: number }>;
 }
-export async function status(attempt: string, signal?: AbortSignal): Promise<MobileStatus> { return (await request('/api/status', attempt, undefined, signal)).json() as Promise<MobileStatus>; }
+export async function status(attempt: string, signal?: AbortSignal): Promise<MobileStatus> {
+  const current = await (await request('/api/status', attempt, undefined, signal)).json() as MobileStatus;
+  rememberPairing(current.paired_device_token); return current;
+}
 export async function finish(grant: string, file: TransferFile, digest: string, signal: AbortSignal) { await request(`/api/files/${file.id}/finish`, grant, { sha256: digest }, signal); }
 export async function complete(grant: string, signal: AbortSignal) { await request('/api/complete', grant, {}, signal); }
 export async function cancel(attempt: string) { await request('/api/cancel', attempt, {}); }
@@ -46,7 +70,7 @@ export function upload(grant: string, file: TransferFile, offset: number, blob: 
     const xhr = new XMLHttpRequest();
     const abort = () => xhr.abort();
     const cleanup = () => signal.removeEventListener('abort', abort);
-    xhr.open('PUT', `/api/files/${file.id}/chunks`);
+    xhr.open('PUT', apiPath(`/api/files/${file.id}/chunks`));
     xhr.timeout = 90000;
     xhr.setRequestHeader('Authorization', `Bearer ${grant}`);
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');

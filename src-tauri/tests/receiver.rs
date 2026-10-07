@@ -365,3 +365,65 @@ async fn stop_receiving_preserves_completed_files_and_cleans_incomplete_data() {
     assert_ne!(next.session_id, session.id);
     h.manager.stop_receiving().await.expect("stop next");
 }
+
+#[tokio::test]
+async fn approval_has_30_seconds_from_request_and_retries_do_not_extend_it() {
+    let h = Harness::new().await;
+    let session = h.manager.active().await.expect("session");
+    let token = session.inner.lock().await.join_token.clone();
+    let request = json!({"token": token,"request_id": uuid::Uuid::new_v4().to_string(),"device": "test browser","files": [{"name": "pending.txt","size": 1}]});
+    let response = h.request(Method::POST, "/api/connect").json(&request).send().await.expect("join");
+    assert_eq!(response.status(), StatusCode::OK);
+    let connection: Value = response.json().await.expect("reply");
+    let requested_at = session.inner.lock().await.requested_at.expect("request clock");
+    let snapshot = session.snapshot().await;
+    assert_eq!(snapshot.approval_expires_at, session.inner.lock().await.requested_unix.map(|at| at + 30));
+    assert!(!session.expired().await);
+    assert_eq!(h.request(Method::POST, "/api/connect").json(&request).send().await.expect("retry").status(), StatusCode::OK);
+    assert_eq!(session.inner.lock().await.requested_at, Some(requested_at));
+    assert_eq!(h.status(connection["attempt_token"].as_str().expect("attempt")).await["state"], "WAITING_FOR_APPROVAL");
+    session.inner.lock().await.requested_at = Some(std::time::Instant::now() - Duration::from_secs(30));
+    assert!(session.expired().await);
+    assert!(h.manager.decide(&session.id, true).await.is_err());
+    assert!(session.inner.lock().await.grant.is_none());
+    assert!(!h.destination.join("pending.txt").exists());
+    h.manager.stop_receiving().await.expect("stop");
+}
+
+#[tokio::test]
+async fn expiry_renews_qr_revokes_old_request_preserves_limits_and_stop_wins() {
+    let h = Harness::new().await;
+    let old = h.manager.active().await.expect("session");
+    let old_token = old.inner.lock().await.join_token.clone();
+    h.request_transfer(&[("not-approved.txt", 1)]).await;
+    old.inner.lock().await.requested_at = Some(std::time::Instant::now() - Duration::from_secs(30));
+    assert!(h.manager.renew_expired_request(&old.id).await.expect("renew"));
+    let fresh = h.manager.active().await.expect("replacement");
+    assert_ne!(fresh.id, old.id);
+    assert_eq!(fresh.replaces_session_id.as_deref(), Some(old.id.as_str()));
+    assert!(Arc::ptr_eq(&fresh.rate, &old.rate));
+    let inner = old.inner.lock().await;
+    assert_eq!(inner.state, SessionState::Expired);
+    assert!(inner.join_token.is_empty() && inner.attempt_token.is_none() && inner.grant.is_none());
+    drop(inner);
+    assert_ne!(fresh.inner.lock().await.join_token, old_token);
+    assert!(tokio::net::TcpStream::connect(old.address).await.is_err());
+    assert!(!h.manager.renew_expired_request(&old.id).await.expect("late watcher"));
+    assert!(h.manager.decide(&old.id, true).await.is_err());
+    h.manager.stop_receiving().await.expect("stop new receiver");
+    assert!(!h.manager.renew_expired_request(&fresh.id).await.expect("stopped watcher"));
+    assert!(h.manager.current.lock().await.is_none());
+}
+
+#[tokio::test]
+async fn approved_transfer_is_not_renewed_after_approval_deadline() {
+    let h = Harness::new().await;
+    let reply = h.request_transfer(&[("approved.txt", 1)]).await;
+    h.accept(reply["attempt_token"].as_str().expect("attempt")).await;
+    let session = h.manager.active().await.expect("session");
+    session.inner.lock().await.requested_at = Some(std::time::Instant::now() - Duration::from_secs(31));
+    assert!(!session.expired().await);
+    assert!(!h.manager.renew_expired_request(&session.id).await.expect("active transfer"));
+    assert_eq!(h.manager.active().await.expect("same session").id, session.id);
+    h.manager.stop_receiving().await.expect("stop");
+}

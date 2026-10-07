@@ -6,6 +6,7 @@ pub const CHUNK_BYTES: u64 = 8 * 1024 * 1024;
 pub const MAX_FILES: usize = 1000;
 pub const MANIFEST_BYTES: usize = 1024 * 1024;
 pub const JOIN_SECONDS: u64 = 600;
+pub const APPROVAL_SECONDS: u64 = 30;
 pub const START_SECONDS: u64 = 120;
 pub const IDLE_SECONDS: u64 = 300;
 pub const MAX_SESSION_SECONDS: u64 = 24 * 60 * 60;
