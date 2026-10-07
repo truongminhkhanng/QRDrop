@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRelay } from './server.mjs';
+import http from 'node:http';
 
 async function fixture(t, options = {}) {
   const server = createRelay({ origin: 'https://receiver.example', testAssets: new Map([['/connect', { body: '<html>fixture</html>', type: 'text/html' }]]), ...options });
@@ -9,7 +10,15 @@ async function fixture(t, options = {}) {
   t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
   const base = `http://127.0.0.1:${server.address().port}`;
   const id = randomBytes(32).toString('hex'), secret = randomBytes(32).toString('hex');
-  const request = (path, options = {}) => fetch(base + path, { ...options, headers: { host: 'receiver.example', ...options.headers } });
+  const request = (path, options = {}) => new Promise((resolve, reject) => {
+    const req = http.request(base + path, { method: options.method ?? 'GET', headers: { host: 'receiver.example', ...options.headers } }, res => {
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('error', reject);
+      res.on('end', () => resolve(new Response([204, 304].includes(res.statusCode) ? null : Buffer.concat(chunks), { status: res.statusCode, headers: res.headers })));
+    });
+    req.on('error', reject); req.end(options.body);
+  });
   const receiver = (path, options = {}) => request(`/receiver/${id}${path}`, { ...options, headers: { authorization: `Bearer ${secret}`, ...options.headers } });
   const receiverId = randomUUID(), receiverSecret = randomBytes(32).toString('hex');
   const registration = await request('/receiver', { method: 'POST', body: JSON.stringify({ id, secret, receiver_id: receiverId, receiver_secret: receiverSecret }) });
@@ -68,4 +77,13 @@ test('production origins require HTTPS and test HTTP must be loopback', () => {
   assert.throws(() => createRelay({ origin: 'http://receiver.example' }));
   assert.throws(() => createRelay({ origin: 'http://192.168.1.2', allowInsecureLoopback: true }));
   assert.throws(() => createRelay({ origin: 'https://receiver.example/path' }));
+});
+test('relay owns the mobile page and authenticates persistent receiver identity', async t => {
+  const h = await fixture(t);
+  assert.equal(await (await h.request(`/s/${h.id}/connect`)).text(), '<html>fixture</html>');
+  const identity = await (await h.request(`/s/${h.id}/identity`)).json();
+  assert.equal(identity.receiver_id, h.receiverId);
+  const takeover = await h.request('/receiver', { method: 'POST', body: JSON.stringify({ id: randomBytes(32).toString('hex'), secret: randomBytes(32).toString('hex'), receiver_id: h.receiverId, receiver_secret: randomBytes(32).toString('hex') }) });
+  assert.equal(takeover.status, 403);
+  assert.equal((await h.request(`/s/${h.id}/identity`)).status, 200);
 });

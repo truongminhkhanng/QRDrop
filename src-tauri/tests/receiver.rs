@@ -4,7 +4,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
-struct Harness { manager: Arc<Manager>, client: Client, base: String, _root: tempfile::TempDir, destination: std::path::PathBuf }
+struct RelayProcess(std::process::Child);
+impl Drop for RelayProcess { fn drop(&mut self) { let _ = self.0.kill(); let _ = self.0.wait(); } }
+struct Harness { manager: Arc<Manager>, client: Client, base: String, origin: String, _root: tempfile::TempDir, destination: std::path::PathBuf, _relay: Option<RelayProcess> }
 impl Harness {
     async fn new() -> Self {
         let root = tempfile::tempdir().expect("test directory");
@@ -12,9 +14,32 @@ impl Harness {
         let manager = Arc::new(Manager::new(root.path().join("state")).expect("manager"));
         *manager.settings.lock().await = Settings { destination: destination.clone() };
         let snapshot = manager.start_at("127.0.0.1:0".parse::<SocketAddr>().expect("address"), true).await.expect("listener");
-        Self { manager, client: Client::new(), base: format!("http://{}", snapshot.address), _root: root, destination }
+        let base = format!("http://{}", snapshot.address);
+        Self { manager, client: Client::new(), origin: base.clone(), base, _root: root, destination, _relay: None }
     }
-    fn request(&self, method: Method, route: &str) -> reqwest::RequestBuilder { self.client.request(method, format!("{}{route}", self.base)).header("Origin", &self.base) }
+    async fn new_relay() -> Self {
+        use std::io::BufRead;
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../relay/test-fixture.mjs");
+        let mut child = std::process::Command::new("node").arg(fixture).stdout(std::process::Stdio::piped()).spawn().expect("Node relay fixture");
+        let mut line = String::new();
+        std::io::BufReader::new(child.stdout.take().expect("fixture stdout")).read_line(&mut line).expect("fixture readiness");
+        let port: u16 = line.trim().parse().expect("fixture port");
+        let origin = format!("http://127.0.0.1:{port}");
+        let root = tempfile::tempdir().expect("test directory");
+        let destination = root.path().join("receive");
+        let manager = Arc::new(Manager::new(root.path().join("state")).expect("manager"));
+        *manager.settings.lock().await = Settings { destination: destination.clone() };
+        let snapshot = manager.start_relay(&origin, true).await.expect("outbound bridge");
+        let base = snapshot.url.split("/connect#").next().expect("mobile base").to_owned();
+        assert_eq!(snapshot.transport, "internet");
+        Self { manager, client: Client::new(), base, origin, _root: root, destination, _relay: Some(RelayProcess(child)) }
+    }
+    async fn fresh_relay(&mut self) {
+        self.manager.stop_receiving().await.expect("stop before fresh QR");
+        let snapshot = self.manager.start_relay(&self.origin, true).await.expect("new relay session");
+        self.base = snapshot.url.split("/connect#").next().expect("mobile base").to_owned();
+    }
+    fn request(&self, method: Method, route: &str) -> reqwest::RequestBuilder { self.client.request(method, format!("{}{route}", self.base)).header("Origin", &self.origin) }
     async fn request_transfer(&self, names: &[(&str,u64)]) -> Value {
         let session = self.manager.active().await.expect("session");
         let token = session.inner.lock().await.join_token.clone();
@@ -425,5 +450,78 @@ async fn approved_transfer_is_not_renewed_after_approval_deadline() {
     assert!(!session.expired().await);
     assert!(!h.manager.renew_expired_request(&session.id).await.expect("active transfer"));
     assert_eq!(h.manager.active().await.expect("same session").id, session.id);
+    h.manager.stop_receiving().await.expect("stop");
+}
+
+#[tokio::test]
+async fn real_outbound_bridge_requires_approval_preserves_bytes_and_revokes_route() {
+    let h = Harness::new_relay().await;
+    let data = b"opaque file over an outbound relay\0\xff";
+    let reply = h.request_transfer(&[("relayed.bin", data.len() as u64)]).await;
+    let attempt = reply["attempt_token"].as_str().expect("attempt");
+    let pending = h.status(attempt).await;
+    let id = pending["files"][0]["id"].as_str().expect("file id");
+    assert_eq!(h.chunk(attempt, id, 0, data).await.status(), StatusCode::FORBIDDEN);
+    assert!(!h.destination.join("relayed.bin").exists());
+    let approved = h.accept(attempt).await;
+    let grant = approved["grant"].as_str().expect("grant");
+    assert_eq!(h.chunk(grant, id, 0, data).await.status(), StatusCode::OK);
+    assert_eq!(h.chunk(grant, id, 0, data).await.status(), StatusCode::OK);
+    h.finish(grant, attempt, id, data).await;
+    assert_eq!(std::fs::read(h.destination.join("relayed.bin")).expect("saved"), data);
+    assert_eq!(h.request(Method::POST, "/api/complete").bearer_auth(grant).json(&json!({})).send().await.expect("complete").status(), StatusCode::OK);
+    h.manager.stop_receiving().await.expect("stop bridge");
+    assert_eq!(h.request(Method::GET, "/api/status").bearer_auth(attempt).send().await.expect("revoked route").status(), StatusCode::GONE);
+}
+
+#[tokio::test]
+async fn trusted_browser_persists_auto_approval_and_revocation_requires_approval_again() {
+    let mut h = Harness::new_relay().await;
+    let reply = h.request_transfer(&[("first.txt", 1)]).await;
+    let attempt = reply["attempt_token"].as_str().expect("attempt");
+    let first = h.manager.active().await.expect("first session");
+    h.manager.decide_with_trust(&first.id, true, true).await.expect("approve and trust");
+    let status = h.status(attempt).await;
+    let token = status["paired_device_token"].as_str().expect("browser pairing").to_owned();
+    let device = h.manager.trusted.lock().await.list().into_iter().next().expect("trusted entry");
+    let saved = std::fs::read_to_string(h.manager.state_dir.join("trusted-devices.json")).expect("registry");
+    assert!(!saved.contains(&token));
+    assert!(qrdrop_lib::trust::TrustStore::load(&h.manager.state_dir).expect("persisted trust").find(&token).is_some());
+    h.fresh_relay().await;
+    let session = h.manager.active().await.expect("fresh session");
+    let request = json!({"token": session.inner.lock().await.join_token.clone(), "request_id": uuid::Uuid::new_v4().to_string(), "device": "renamed browser", "files": [{"name": "auto.txt", "size": 1}], "trusted_device_token": token});
+    let response = h.request(Method::POST, "/api/connect").json(&request).send().await.expect("trusted connect");
+    assert_eq!(response.status(), StatusCode::OK);
+    let reply: Value = response.json().await.expect("reply");
+    let attempt = reply["attempt_token"].as_str().expect("attempt");
+    let automatic = h.status(attempt).await;
+    assert_eq!(automatic["state"], "APPROVED");
+    assert!(automatic["grant"].is_string());
+    assert_eq!(session.snapshot().await.trusted_device_name.as_deref(), Some(device.name.as_str()));
+    h.manager.forget_trusted_device(&device.id).await.expect("revoke");
+    let denied = h.status(attempt).await;
+    assert_eq!(denied["state"], "CANCELLED");
+    assert!(denied["grant"].is_null());
+    assert!(!h.destination.join("auto.txt").exists());
+    h.fresh_relay().await;
+    let next = h.manager.active().await.expect("new session");
+    let mut stale = request;
+    stale["token"] = json!(next.inner.lock().await.join_token.clone());
+    stale["request_id"] = json!(uuid::Uuid::new_v4().to_string());
+    let response = h.request(Method::POST, "/api/connect").json(&stale).send().await.expect("revoked browser");
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(next.inner.lock().await.state, SessionState::WaitingForApproval);
+    h.manager.stop_receiving().await.expect("stop");
+}
+
+#[tokio::test]
+async fn plain_lan_cannot_pair_a_long_lived_trusted_browser() {
+    let h = Harness::new().await;
+    h.request_transfer(&[("manual.txt", 1)]).await;
+    let session = h.manager.active().await.expect("session");
+    assert!(!session.snapshot().await.trust_available);
+    assert!(h.manager.decide_with_trust(&session.id, true, true).await.is_err());
+    assert!(h.manager.trusted.lock().await.list().is_empty());
+    assert!(session.inner.lock().await.grant.is_none());
     h.manager.stop_receiving().await.expect("stop");
 }

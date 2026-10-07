@@ -20,11 +20,13 @@ jobs:
       - run: npm run test:hash
       - run: npm run test:mobile
       - run: npm run test:codeintel
-      - run: node --test relay/server.test.mjs
       - name: Resolve new HTTPS dependencies
         run: cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
       - name: Export genuine lockfile for the restricted workspace
         run: node -e "const z=require('node:zlib'),f=require('node:fs'),c=require('node:crypto'); const b=f.readFileSync('src-tauri/Cargo.lock'); console.log('QRDROP_LOCK_SHA256 '+c.createHash('sha256').update(b).digest('hex')); console.log('QRDROP_LOCK_GZIP '+z.gzipSync(b).toString('base64'))"
       - name: Test real receivers and relay
+        if: ${{ !cancelled() }}
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --no-default-features
+      - run: node --test relay/server.test.mjs
+        if: ${{ !cancelled() }}
       - run: npm run codeintel -- update
