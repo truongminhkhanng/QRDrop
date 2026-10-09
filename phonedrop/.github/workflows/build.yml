@@ -1,0 +1,99 @@
+name: Test and build PhoneDrop
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python 3.12 tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt pytest
+      - name: Run all tests, including real HTTP and HTTPS
+        run: python -m pytest -q
+      - name: Validate mobile JavaScript syntax
+        run: |
+          python -c "from app import MOBILE_HTML; from pathlib import Path; Path('mobile-check.js').write_text(MOBILE_HTML.split('<script nonce=')[1].split('>',1)[1].split('</script>')[0].replace('__SESSION_JSON__', '\"syntax-check\"'), encoding='utf-8')"
+          node --check mobile-check.js
+
+  build:
+    name: Build and run Windows executable
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt pyinstaller
+      - run: pyinstaller --onefile --windowed --name PhoneDrop app.py
+      - name: Run packaged Tk, QR, TLS and HTTP upload smoke test
+        shell: pwsh
+        run: |
+          $resultPath = Join-Path $pwd 'smoke-result.json'
+          $process = Start-Process -FilePath '.\dist\PhoneDrop.exe' -ArgumentList @('--self-test', "`"$resultPath`"") -PassThru
+          if (-not $process.WaitForExit(90000)) {
+            Stop-Process -Id $process.Id -Force
+            throw 'Packaged smoke test timed out'
+          }
+          if ($process.ExitCode -ne 0) { throw 'Packaged smoke test failed' }
+          if (-not (Test-Path $resultPath)) { throw 'Missing smoke test result' }
+          $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+          if (-not ($result.ok -and $result.tk -and $result.qr -and $result.tls -and $result.http_upload)) {
+            throw 'Incomplete packaged smoke test'
+          }
+          $exe = Get-Item 'dist/PhoneDrop.exe'
+          if ($exe.Length -lt 5MB -or $exe.Length -gt 250MB) { throw 'Unexpected executable size' }
+          $bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
+          if ($bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw 'Invalid Windows executable header' }
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  PhoneDrop.exe" | Set-Content -Encoding ascii 'dist/PhoneDrop.exe.sha256'
+          Write-Output "Verified PhoneDrop.exe: $($exe.Length) bytes"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PhoneDrop-Windows
+          path: |
+            dist/PhoneDrop.exe
+            dist/PhoneDrop.exe.sha256
+            smoke-result.json
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Release tagged executable
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: PhoneDrop-Windows
+          path: artifact
+      - uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          files: |
+            artifact/dist/PhoneDrop.exe
+            artifact/dist/PhoneDrop.exe.sha256
