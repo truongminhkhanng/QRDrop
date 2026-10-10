@@ -1,0 +1,81 @@
+name: Clean up six approved old releases
+
+on:
+  push:
+    branches: [maintenance/cleanup-releases-2026-10-10]
+    paths:
+      - '.github/workflows/cleanup-old-releases.yml'
+      - '.github/release-cleanup-2026-10-10.json'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: phonedrop-official-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete only the six approved releases; keep source and latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLEANUP_REPO: ${{ github.repository }}
+        shell: python
+        run: |
+          import json, os, subprocess
+          from pathlib import Path
+
+          manifest = json.loads(Path('.github/release-cleanup-2026-10-10.json').read_text())
+          repo = os.environ['CLEANUP_REPO']
+          assert repo == manifest['repository'] == 'truongminhkhanng/QRDrop'
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/{path}']))
+          def releases():
+              found = []
+              page = 1
+              while True:
+                  batch = api(f'releases?per_page=100&page={page}')
+                  found.extend(batch)
+                  if len(batch) < 100:
+                      return found
+                  page += 1
+          def summary(release):
+              return {'id': release['id'], 'tag': release['tag_name'], 'draft': release['draft'],
+                      'assets': sorted([{'id': a['id'], 'size': a['size'], 'digest': a['digest']}
+                                        for a in release['assets']], key=lambda a: a['id'])}
+          def refs(kind):
+              return {r['ref']: r['object']['sha'] for r in api(f'git/matching-refs/{kind}')}
+
+          expected = manifest['delete']
+          assert len(expected) == 6 and len({r['id'] for r in expected}) == 6
+          assert manifest['keep']['id'] not in {r['id'] for r in expected}
+          before = {r['id']: r for r in releases()}
+          keep_before = api(f"releases/{manifest['keep']['id']}")
+          assert summary(keep_before) == manifest['keep']
+          assert api('releases/latest')['id'] == keep_before['id']
+          tags_before, heads_before = refs('tags'), refs('heads')
+          # Validate the complete deletion set before making the first change.
+          for release in expected:
+              assert release['id'] in before and summary(before[release['id']]) == release
+
+          for release in expected:
+              assert summary(api(f"releases/{release['id']}")) == release
+              assert api('releases/latest')['id'] == keep_before['id']
+              subprocess.run(['gh', 'api', '--method', 'DELETE',
+                              f"repos/{repo}/releases/{release['id']}"], check=True)
+              print(f"Deleted release {release['tag']} (ID {release['id']})")
+
+          after = {r['id']: r for r in releases()}
+          removed = {r['id'] for r in expected}
+          assert not removed.intersection(after)
+          for release_id in set(before) - removed:
+              assert summary(after[release_id]) == summary(before[release_id])
+          keep_after = api(f"releases/{manifest['keep']['id']}")
+          assert summary(keep_after) == summary(keep_before)
+          assert keep_after['body'] == keep_before['body']
+          assert api('releases/latest')['id'] == keep_before['id']
+          assert refs('tags') == tags_before and refs('heads') == heads_before
+          print('Verified: six old releases deleted; repository, all refs and PhoneDrop 1.0.1 preserved.')

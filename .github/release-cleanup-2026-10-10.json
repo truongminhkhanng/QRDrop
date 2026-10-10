@@ -1,0 +1,174 @@
+{
+  "repository": "truongminhkhanng/QRDrop",
+  "keep": {
+    "id": 408982132,
+    "tag": "phonedrop-v1.0.1",
+    "draft": false,
+    "assets": [
+      {
+        "id": 628100710,
+        "size": 81,
+        "digest": "sha256:cc0988d9914904cd9ca73b6af4c61fb5b5a97e16d65d0cbb7c73f2bcb6059c65"
+      },
+      {
+        "id": 628100714,
+        "size": 23493792,
+        "digest": "sha256:f8141547ce4197961e2b3f98f18f3de1dca5db5b48ba56c175e229b8b3054f07"
+      }
+    ]
+  },
+  "delete": [
+    {
+      "id": 404850891,
+      "tag": "test-37482136952-1",
+      "draft": true,
+      "assets": [
+        {
+          "id": 615819540,
+          "size": 4005291,
+          "digest": "sha256:2001b0bc74fdfdbb0533ce4f892167e172f848be291906cd1fd9ffea0d46ec95"
+        },
+        {
+          "id": 615836398,
+          "size": 4961130,
+          "digest": "sha256:8ec37aefe813c58ebe02c63e08b5268915ce12cfce7d063d2931e349bf45abf7"
+        },
+        {
+          "id": 615836400,
+          "size": 80476664,
+          "digest": "sha256:a392b732e42a1178dbeed016048520d33413a86e886149ebd52e9e9e8b3cccdc"
+        },
+        {
+          "id": 615851715,
+          "size": 218094443,
+          "digest": "sha256:d8b5e41b11d0b638dc7ed5429ecd6407283cd8f3abdb0d8a34474167fd0c2040"
+        }
+      ]
+    },
+    {
+      "id": 404720110,
+      "tag": "test-37468085213-1",
+      "draft": true,
+      "assets": [
+        {
+          "id": 615554779,
+          "size": 3986989,
+          "digest": "sha256:7c8ba3676c2ed0685ea397dc1f82fb2fc81b9808814fa3864fab982978723f6f"
+        },
+        {
+          "id": 615562886,
+          "size": 80460280,
+          "digest": "sha256:df5c5c8e32f5eadc64f4ed01a7f5e6735a2774768718e631935b63cbe821d655"
+        },
+        {
+          "id": 615562891,
+          "size": 4940312,
+          "digest": "sha256:1ad10673cf78799ffb0a954c78b972f6f85201c146c2d1c105ba25d3649aa943"
+        },
+        {
+          "id": 615594756,
+          "size": 218073900,
+          "digest": "sha256:296fbd84abf6a3c4e343a1fb930462b2911467441ade3349be299ab9b5a2d12e"
+        }
+      ]
+    },
+    {
+      "id": 404232651,
+      "tag": "test-37401346039-1",
+      "draft": true,
+      "assets": [
+        {
+          "id": 614164350,
+          "size": 3991086,
+          "digest": "sha256:8b7dbdc7e38ff33310bed9a0915281cb5fb519cb013807603da00271c39dcf02"
+        },
+        {
+          "id": 614178181,
+          "size": 80468472,
+          "digest": "sha256:853b96fdd9ec7644051eda5d1b35f215450a6c8359ee4cfc067adfceb8cfff96"
+        },
+        {
+          "id": 614178182,
+          "size": 4943938,
+          "digest": "sha256:99d1b42338d3b3248d92198cfc94cf9e6d5393446c8c13aaf00fe4065f771cf7"
+        },
+        {
+          "id": 614193178,
+          "size": 218079685,
+          "digest": "sha256:cfa1c3a8d60e78a9fd656de3bd5b6593d0c9af8870958d5ff68a83248f0824de"
+        }
+      ]
+    },
+    {
+      "id": 408972650,
+      "tag": "phonedrop-v1.0.0",
+      "draft": false,
+      "assets": [
+        {
+          "id": 628057406,
+          "size": 23495450,
+          "digest": "sha256:ae1a602c00805a397334b770a5c384433fc6d9f81d8ee5922886463fa638fe2c"
+        },
+        {
+          "id": 628057409,
+          "size": 81,
+          "digest": "sha256:db8d99299c218b98d2adc202e27c3725e93fac22b6dd92b578d54aa5637923f0"
+        }
+      ]
+    },
+    {
+      "id": 404865053,
+      "tag": "v1.0.0",
+      "draft": false,
+      "assets": [
+        {
+          "id": 615854009,
+          "size": 4005291,
+          "digest": "sha256:2001b0bc74fdfdbb0533ce4f892167e172f848be291906cd1fd9ffea0d46ec95"
+        },
+        {
+          "id": 615854010,
+          "size": 80476664,
+          "digest": "sha256:a392b732e42a1178dbeed016048520d33413a86e886149ebd52e9e9e8b3cccdc"
+        },
+        {
+          "id": 615854015,
+          "size": 218094443,
+          "digest": "sha256:d8b5e41b11d0b638dc7ed5429ecd6407283cd8f3abdb0d8a34474167fd0c2040"
+        },
+        {
+          "id": 615854019,
+          "size": 4961130,
+          "digest": "sha256:8ec37aefe813c58ebe02c63e08b5268915ce12cfce7d063d2931e349bf45abf7"
+        }
+      ]
+    },
+    {
+      "id": 404759440,
+      "tag": "v0.1.0",
+      "draft": false,
+      "assets": [
+        {
+          "id": 615629910,
+          "size": 3989963,
+          "digest": "sha256:75da57075abe0db7cbb7455a1afad1148e8374141264ad159f858b02f3530ebb"
+        },
+        {
+          "id": 615650032,
+          "size": 80464376,
+          "digest": "sha256:ddd8dd107f335efb8d957c5c33a1256d6215f3061c3d9b5f40ab9a3c1d2d922b"
+        },
+        {
+          "id": 615650033,
+          "size": 4941382,
+          "digest": "sha256:28ed704a834366bf1dd61d1dbbd604ef77adb0eba3f0f48f81e47a7749d888e3"
+        },
+        {
+          "id": 615670718,
+          "size": 218085176,
+          "digest": "sha256:d1a9acfa4b3349372a4997f62eb317a27a685f2bdc72b3ba058d47df18f9b178"
+        }
+      ]
+    }
+  ]
+}
