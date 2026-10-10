@@ -1,50 +1,41 @@
-# Bằng chứng kiểm chứng PhoneDrop — 2026-10-09
+# Bằng chứng kiểm chứng PhoneDrop — 2026-10-10
 
-**Chưa đạt Definition of Done: chưa có Actions run xanh, chưa có file Windows `.exe`, chưa có repo/release GitHub được tạo thành công.** Đây là bản source đã triển khai với các giới hạn xác minh dưới đây, không phải tuyên bố sản phẩm đã hoàn tất.
+## Trạng thái hiện tại
 
-## Đã chạy trong môi trường hiện tại
+Source cục bộ có phiên nhận tối đa 12 giờ, timeout gửi mobile lấy từ cùng cấu hình server, đồng hồ giờ:phút:giây và ngắt thủ công. 12 giờ là mặc định agent chọn khi tiếp tục yêu cầu kéo dài phiên; chưa phải thời lượng user xác nhận riêng. QR 120 giây và chờ duyệt 60 giây giữ nguyên.
 
-- Python 3.12.3, pytest có sẵn; `python3 -m pytest -q -m 'not network'`: **112 passed, 3 deselected**.
-- `node --check` với JavaScript trích nguyên từ trang mobile: pass.
-- `python3 -m compileall -q app.py core.py tls_support.py tests`: pass.
-- Workflow YAML parse thành công; kiểm tra phụ thuộc `test → build → release` pass.
-- Kiểm thử HTTPS không socket dùng cryptography 41.0.7 có sẵn. CI cài dependency khai báo `cryptography>=42.0`; chưa kiểm chứng phiên bản CI thực tế ở môi trường này.
+**Chưa hoàn tất bản phát hành Windows:** source mới chưa chạy CI/native, chưa có PhoneDrop.exe được xác minh, chưa kiểm thử điện thoại thật. Sau khi nhận bản xem trước và câu hỏi tiếp tục GitHub/EXE, user yêu cầu “AGENT.md Làm xong cho tao đi”; agent tiếp tục upload và CI theo chỉ dẫn đó. Điều này không phải bằng chứng user đã kiểm tra trực quan native UI. Xem [bản xem trước](docs/ux-preview.html) và [bản mô tả UX](docs/UX_REVIEW.md).
 
-## Các bước đã thử nhưng bị chặn
+## Đã kiểm tra trên source hiện tại
 
-- `python3 -m pytest -q -m network`: **2 errors + 1 failed**, cả ba tại `socket.socket(...)` với `PermissionError: [Errno 1] Operation not permitted`, trước khi bind localhost. Hai test HTTP và một test HTTPS vẫn là test bắt buộc trong CI; không có automatic skip hay mock thay mạng để giả vờ pass.
-- Cài requirements/PyInstaller vào `.venv`: pip không lấy được qrcode (`No matching distribution found`). qrcode, Pillow, Tkinter và PyInstaller không có sẵn; không có local GUI/packaging evidence. Không thể cross-compile Windows exe bằng PyInstaller trên Linux.
-- `gh auth status` không xác thực được; `gh api user` báo không kết nối `api.github.com`. GitHub connector đọc được profile nhưng tra `truongminhkhanng/phonedrop` trả 404, không cung cấp thao tác tạo repo. Không thể coi 404 là bằng chứng repo không tồn tại ở mọi nơi; nó chưa truy cập được qua connector.
-- Đã chạy `gh repo create phonedrop --private --source=. --push`: thất bại với `error connecting to api.github.com`. Repo Git cục bộ đã init nhánh `main` và commit source. Chưa có remote được tạo, workflow run để watch hoặc artifact/release để tải. Không tạo tag phát hành trước khi test/build xanh.
+- `python3 -m pytest -q -m 'not network'`: **126 passed, 3 deselected**.
+- `node tests/mobile-ui.test.cjs`: **11 passed**. Test nạp HTML đã được Python tạo để kiểm tra đúng timeout trong trang được phục vụ; `node --test tests/mobile-ui.test.cjs` cũng exit 0 (Node 26 ở môi trường này gộp báo cáo theo file).
+- `python3 tools/check_mobile.py`: JavaScript mobile hợp lệ.
+- Python compileall cho app/core/desktop/viewmodel/TLS/tests/tools: pass.
+- Preview được tạo lại từ source, gồm đồng hồ 11:59:42 và timeout mobile 12 giờ. Desktop vẫn là minh họa, mobile dùng mạng giả lập và không đọc nội dung file.
 
-## Ma trận yêu cầu bảo mật
-
-✔ dưới đây nghĩa là **code + test logic/handler đã pass**, không có nghĩa toàn bộ ứng dụng/network/Windows đã được xác minh.
-
-| Yêu cầu | Code | Bằng chứng đã chạy |
+| Hành vi | Bằng chứng | Giới hạn của bằng chứng |
 |---|---|---|
-| ✔ Bind IP private cụ thể, cổng ngẫu nhiên | `lan_ipv4`, `PhoneDropServer`, GUI `(ip, 0)` | `test_lan_ip`, `test_server_refuses_public_wildcard_and_loopback_by_default`; bind thật chưa chạy được |
-| ✔ QR token 16 byte, một lần, 120s, constant-time | `State._new_token/join/_matches/tick` | `test_token_one_use`, `test_token_expiry_and_auto_rotation`, `test_token_constant_time_comparison`, `test_simultaneous_token_consumption_is_atomic` |
-| ✔ Session 32 byte, một phiên, IP, duyệt, 20 phút | `State.join/set_state/authorize` | `test_pending_wrong_ip_wrong_session_and_approval`, `test_session_expiry_not_extended_by_polling`, `test_monotonic_deadlines_ignore_system_wall_clock` |
-| ✔ Duyệt desktop, timeout 60s, hộp thoại cũ vô hiệu | `State.set_state`, `app.show_approval` | `test_approval_deadline_and_stale_dialog`, `test_pending_upload_creates_no_files`; topmost/GUI chưa chạy được |
-| ✔ Đúng ba route, không API đọc/chạy lệnh | `Handler.dispatch` | `test_only_three_routes`, `test_invalid_host_and_forwarded_ip`; review source |
-| ✔ Basename, ký tự cấm, tên dành riêng, ≤150 ký tự | `safe_name` | `test_safe_name`, `test_safe_name_long`, `test_reserved_name_with_space` |
-| ✔ Chặn các đuôi yêu cầu, checkbox tắt, bật phải xác nhận | `is_dangerous`, `begin_upload`, `change_executable_policy` | `test_dangerous_extensions` (34 đuôi), `test_executable_policy`, `test_executable_switch_requires_confirmation` |
-| ✔ 5 GiB, bắt buộc Content-Length, đọc có giới hạn | `Handler.receive_upload`, `State.write_upload` | `test_upload_validation`, `test_duplicate_length_rejected`, `test_reads_exact_content_length`, `test_upload_size_guard_before_write` |
-| ✔ `.part`, đủ byte mới công bố, không ghi đè | `begin_upload/finish_upload/publish_part` | `test_file_no_clobber_and_exact_bytes`, `test_short_body_cleans_part`, `test_zero_byte_file`, `test_no_clobber_if_file_created_during_publication` |
-| ✔ Ngắt phiên thu hồi quyền và dọn file đang nhận | `State.rotate/close/_abort_upload` | `test_revoke_cancels_socket_and_part`, `test_expiry_cancels_in_progress_upload`, `test_rejection_rotation_shutdown` |
-| ✔ Sai 10 lần khóa IP 5 phút | `State._check_block/_bad` | `test_ip_block_after_ten_failures_survives_rotation`, `test_invalid_session_also_counts`, `test_limiter_capacity_is_bounded` |
-| ✔ Header an toàn, không lỗi chi tiết/token trong log | `Handler.reply/send_error/log_message` | `test_security_headers_and_no_secret_logs`, `test_storage_error_generic_no_traceback` |
-| ✔ Chứng chỉ tự ký ngẫu nhiên/fingerprint và xóa key tạm | `create_tls_context` | `test_fresh_certificate_san_fingerprint_and_key_cleanup`, `test_certificate_failure_removes_private_key` |
-| ✘ HTTP/HTTPS thực tế, fingerprint qua TLS, ngắt socket thật | `PhoneDropServer`, test `network` | Có test nhưng 3 test chưa pass vì sandbox cấm socket |
-| ✘ Giao diện Windows, đóng gói, phát hành | `app.py`, `.github/workflows/build.yml` | Có smoke test trong exe/CI; chưa chạy được CI, chưa có `.exe` |
+| Tiếp tục upload sau mốc 20 phút | `test_slow_upload_crosses_old_twenty_minute_deadline` | Đồng hồ mô phỏng, dữ liệu nhỏ ghi đĩa thật |
+| 500 file tuần tự, không gia hạn phiên | `test_500_sequential_handler_uploads_beyond_old_deadline` | HTTP handler thật với stream trong bộ nhớ; 500 file nhỏ ghi đĩa, thời gian mô phỏng 5.000 giây |
+| 500 lựa chọn mobile chỉ gửi một lần, từng file tuần tự | Test JavaScript 500 file | DOM/XHR giả lập, không truyền payload qua mạng |
+| Video 500 MiB và file đúng 5 GiB qua kiểm tra dung lượng | Test Python khai báo tổng byte và test mobile metadata | Không cấp phát hay truyền 5 GiB; quá 5 GiB vẫn bị chặn |
+| Ngắt thủ công hủy upload, thu hồi quyền, giữ file hoàn tất | `test_manual_disconnect_after_old_deadline_preserves_completed_files`, test JS ngắt giữa 500 file | Đĩa thật, socket/XHR giả lập; ghép nối mới vẫn phải duyệt |
+| Hết hạn phiên, polling không gia hạn, QR/duyệt riêng | Test expiry, monotonic clock, QR và stale-dialog hiện có | Test logic với đồng hồ mô phỏng |
+| Guard Host/Origin, session/IP, executable, no-overwrite, streaming, TLS key cleanup | Các test core/TLS hiện có | Xem mã test; không thay thế kiểm tra thiết bị |
 
-`/status` nhận đúng session/IP chưa duyệt trả **202 pending** để trang chờ hoạt động; **200 approved** chỉ khi duyệt. `/upload` luôn cần approved. Đây là cách giải quyết hai yêu cầu “trang chờ polling” và “kiểm tra trạng thái approved”, đã ghi rõ trong README và test handler.
+`/status` trả 202 cho phiên đúng đang chờ và 200 cho phiên đã duyệt; `/upload` luôn yêu cầu phiên đã duyệt. Phiên nhận vẫn có hạn chót tuyệt đối từ lúc duyệt; file đang dở bị hủy khi hết hạn. Chưa có resumable upload.
 
-## Cần môi trường có mạng/socket để xác minh tiếp
+## Giới hạn môi trường đã xác minh lại
 
-Chạy `python -m pytest -q` đầy đủ, tạo/push repo riêng `phonedrop`, dùng `gh run watch --exit-status`, đọc `gh run view --log-failed` nếu lỗi, sửa/push đến khi xanh. Khi main xanh mới push tag `v1.0.0`, theo dõi run của tag, tải artifact/release, kiểm tra `MZ`, kích thước/SHA-256 và chạy trên Windows. Tiếp đó kiểm tra điện thoại thật qua Wi-Fi/Ethernet, approval timeout và HTTPS/fingerprint. Không thay các bước đó bằng kết quả in-memory.
+Chạy toàn bộ pytest trước khi sửa: 121 pass, 2 errors và 1 failed. Cả ba test mạng dừng tại tạo socket với `PermissionError: [Errno 1] Operation not permitted`, trước khi bind. Ba test HTTP/HTTPS vẫn bắt buộc trong CI; không sửa thành mock hoặc bỏ qua tự động.
 
-## Cập nhật repo đích
+Tkinter, Pillow, qrcode và PyInstaller vẫn không có trong môi trường hiện tại. Không có bằng chứng chạy native GUI hay đóng gói tại đây; Linux không tạo được Windows EXE bằng PyInstaller. Codeintel status/update cũng không chạy do thiếu TypeScript; việc sửa dựa trên đọc source và kiểm thử trực tiếp.
 
-User chọn dùng repo có sẵn `truongminhkhanng/QRDrop`. Kết nối GitHub xác minh repo public với quyền push/admin, đọc được main và workflow. Dùng connector để đưa source vào nhánh `feature/phonedrop`, workflow riêng ở `.github/workflows/phonedrop.yml`; kiểm chứng CI đang tiếp tục. Lỗi gh terminal không đồng nghĩa connector không ghi được repo hiện có. Không tạo repo phonedrop riêng nữa.
+## CI trước đây và bước còn lại
+
+[Run 37938480572](https://github.com/truongminhkhanng/QRDrop/actions/runs/37938480572) của source cũ `c4f2cff53815d66ca8e140c23b67408553178d04` đã được kiểm tra ở phiên trước: 115 pytest pass trên Windows/Linux, gồm HTTP/HTTPS. Windows job dừng tại quoting PowerShell của bước JavaScript. Bản sửa cục bộ dùng `tools/check_mobile.py`; không gán kết quả run cũ cho source hiện tại.
+
+Bước tiếp theo: đưa đúng thư mục `phonedrop/` và workflow gốc `.github/workflows/phonedrop.yml` lên nhánh `feature/phonedrop` của repo `truongminhkhanng/QRDrop`. Không thay toàn bộ cây QRDrop bằng Git độc lập trong phonedrop. Theo dõi test Linux/Windows và smoke test executable (Tk, desktop UI, QR, TLS, HTTP upload), tải artifact rồi xác minh MZ, SHA-256 và chạy trên Windows. Chỉ phát hành bằng tag riêng `phonedrop-v1.0.0` sau khi thành công; giữ nguyên release QRDrop.
+
+Kiểm tra tiếp Android/iPhone trên Wi-Fi ↔ Ethernet, 500 file/~5 GB thật, ngắt/hết hạn giữa upload, Firewall, DPI 125–200%, QR camera, keyboard và HTTPS fingerprint. Không coi preview hay test dữ liệu nhỏ là bằng chứng cho những bước này.

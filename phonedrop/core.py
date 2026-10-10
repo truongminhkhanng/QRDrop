@@ -23,7 +23,7 @@ MAX_FILE_SIZE = 5 * 1024**3
 CHUNK_SIZE = 256 * 1024
 TOKEN_SECONDS = 120
 APPROVAL_SECONDS = 60
-SESSION_SECONDS = 20 * 60
+SESSION_SECONDS = 12 * 60 * 60
 BLOCK_SECONDS = 300
 MAX_CLIENTS = 12
 DANGEROUS_EXTENSIONS = frozenset('''
@@ -114,6 +114,7 @@ class Upload:
     connection: object = field(repr=False)
     size: int = 0
     closed: bool = False
+    total: int | None = None
 
 
 class State:
@@ -149,6 +150,7 @@ class State:
             return
         self.upload = None
         upload.closed = True
+        self.emit('cancelled', upload.name)
         if upload.connection is not None:
             try:
                 upload.connection.shutdown(socket.SHUT_RDWR)
@@ -259,7 +261,12 @@ class State:
         with self.lock:
             self.tick()
             session = self.session
+            upload = self.upload
             return {'token': self.token, 'remaining': max(0, int(self.token_until - self.clock())),
+                    'session_remaining': (max(0, int(session.approved_until - self.clock()))
+                                          if session and session.status == 'approved' else 0),
+                    'upload': (None if upload is None else
+                               {'name': upload.name, 'received': upload.size, 'total': upload.total}),
                     'session': None if session is None else
                     (session.sid, session.ip, session.user_agent, session.status,
                      max(0, int(session.pending_until - self.clock())))}
@@ -277,9 +284,11 @@ class State:
             self.rotate()  # Revoke grants whenever the local security policy changes.
             self.allow_executables = bool(allowed)
 
-    def begin_upload(self, sid, ip, name, connection=None):
+    def begin_upload(self, sid, ip, name, connection=None, *, total=None):
         with self.lock:
             self.authorize(sid, ip)
+            if total is not None and (type(total) is not int or not 0 <= total <= MAX_FILE_SIZE):
+                raise RequestError(413, 'Dung lượng file không hợp lệ.')
             clean = safe_name(name)
             if not self.allow_executables and (is_dangerous(name) or is_dangerous(clean)):
                 raise RequestError(415, 'Loại file này bị chặn trên máy tính.')
@@ -293,6 +302,7 @@ class State:
                 Path(part).unlink(missing_ok=True)
                 raise
             self.upload = Upload(sid, ip, clean, self.folder, Path(part), file, connection)
+            self.upload.total = total
             return self.upload
 
     def write_upload(self, upload, chunk):
@@ -302,6 +312,8 @@ class State:
             self.authorize(upload.sid, upload.ip)
             if upload.size + len(chunk) > MAX_FILE_SIZE:
                 raise RequestError(413, 'File vượt quá 5 GiB.')
+            if upload.total is not None and upload.size + len(chunk) > upload.total:
+                raise RequestError(400, 'Dữ liệu vượt quá dung lượng đã khai báo.')
             upload.file.write(chunk)
             upload.size += len(chunk)
 
@@ -312,6 +324,8 @@ class State:
             self.authorize(upload.sid, upload.ip)
             if upload.size != expected:
                 raise RequestError(400, 'File chưa được nhận đầy đủ.')
+            if upload.total is not None and expected != upload.total:
+                raise RequestError(400, 'Dung lượng không khớp yêu cầu.')
             upload.file.flush()
             os.fsync(upload.file.fileno())
             upload.file.close()
@@ -544,7 +558,7 @@ class Handler(BaseHTTPRequestHandler):
         if not encoded or len(encoded) > 4096:
             raise RequestError(400, 'Tên file không hợp lệ.')
         name = unquote(encoded, encoding='utf-8', errors='strict')
-        upload = state.begin_upload(sid, ip, name, self.connection)
+        upload = state.begin_upload(sid, ip, name, self.connection, total=length)
         try:
             self.connection.settimeout(15)
             remaining = length

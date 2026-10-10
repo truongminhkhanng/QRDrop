@@ -122,6 +122,65 @@ def test_session_expiry_not_extended_by_polling(state):
     assert state.session is None
 
 
+def test_slow_upload_crosses_old_twenty_minute_deadline(state):
+    sid = approve(state)
+    upload = state.begin_upload(sid, '127.0.0.1', 'slow.txt', total=6)
+    state.write_upload(upload, b'abc')
+    state.clock.advance(20 * 60 + 1)
+    assert state.authorize(sid, '127.0.0.1') == 'approved'
+    state.write_upload(upload, b'def')
+    assert state.finish_upload(upload, 6) == 'slow.txt'
+    assert (state.folder / 'slow.txt').read_bytes() == b'abcdef'
+
+
+def test_500_sequential_handler_uploads_beyond_old_deadline(state):
+    # Real handler/disk, in-memory HTTP streams and simulated time; not phone E2E.
+    sid = approve(state)
+    deadline = state.session.approved_until
+    for index in range(500):
+        state.clock.advance(10)
+        body = f'file {index}'.encode()
+        name = f'photo-{index}.jpg'
+        code, _, data = request_memory(state, 'POST', '/upload',
+                                       upload_headers(sid, name, len(body)), body)
+        assert code == 201 and json.loads(data)['name'] == name
+        assert (state.folder / name).read_bytes() == body
+        assert state.upload is None
+    assert len(list(state.folder.iterdir())) == 500
+    assert state.session.approved_until == deadline
+    assert state.authorize(sid, '127.0.0.1') == 'approved'
+
+
+def test_manual_disconnect_after_old_deadline_preserves_completed_files(state):
+    sid = approve(state)
+    assert request_memory(state, 'POST', '/upload', upload_headers(sid), b'data')[0] == 201
+    state.clock.advance(20 * 60 + 1)
+    connection = MemoryConnection(b'')
+    upload = state.begin_upload(sid, '127.0.0.1', 'unfinished.txt', connection, total=10)
+    state.write_upload(upload, b'partial')
+    state.rotate()
+    assert connection.shutdown_calls == [socket.SHUT_RDWR]
+    assert upload.closed and not upload.part.exists()
+    assert (state.folder / 'a.txt').read_bytes() == b'data'
+    assert len(list(state.folder.iterdir())) == 1
+    with pytest.raises(RequestError):
+        state.write_upload(upload, b'end')
+    assert request_memory(state, 'POST', '/upload', upload_headers(sid), b'data')[0] == 403
+    newer = state.join(state.token, '127.0.0.1', 'Phone')
+    assert newer.status == 'pending' and newer.sid != sid
+    assert not state.set_state(sid, 'approved')
+
+
+@pytest.mark.parametrize('size', [500 * 1024**2, MAX_FILE_SIZE])
+def test_large_file_declared_size_is_accepted_without_preallocation(state, size):
+    # Validate metadata only; do not pretend to transfer 500 MiB or 5 GiB here.
+    sid = approve(state)
+    upload = state.begin_upload(sid, '127.0.0.1', 'video.mp4', total=size)
+    assert upload.total == size and upload.part.stat().st_size == 0
+    state.cancel_upload(upload)
+    assert not list(state.folder.iterdir())
+
+
 def test_rejection_rotation_shutdown(state):
     pending = state.join(state.token, '1', '')
     assert state.set_state(pending.sid, 'denied')
