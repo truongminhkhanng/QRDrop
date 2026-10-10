@@ -4,7 +4,7 @@
 
 ## Trạng thái bản source này
 
-Đã có mã ứng dụng, kiểm thử và workflow Windows. Xem `VERIFICATION.md` để biết chính xác phần đã chạy và phần bị môi trường chặn. Chỉ coi bản `.exe` được xác minh khi workflow **Test and build PhoneDrop** xanh, gồm cả smoke test chạy chính executable. Source chưa được chứng minh hoạt động trên điện thoại thật.
+Đã tạo EXE và chạy smoke test thành công trên Windows trong [CI38055824859](https://github.com/truongminhkhanng/QRDrop/actions/runs/38055824859); 129 test Python và 11 test JavaScript đạt trên Windows/Linux. Xem `VERIFICATION.md` để biết chính xác phần đã chạy và phần bị môi trường chặn. Chỉ coi bản `.exe` được xác minh khi workflow **Test and build PhoneDrop** xanh, gồm cả smoke test chạy chính executable. Source chưa được chứng minh hoạt động trên điện thoại thật.
 
 ## Cách dùng trên Windows
 

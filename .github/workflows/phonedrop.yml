@@ -76,6 +76,8 @@ jobs:
           $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
           "$hash  PhoneDrop.exe" | Set-Content -Encoding ascii 'dist/PhoneDrop.exe.sha256'
           Write-Output "Verified PhoneDrop.exe: $($exe.Length) bytes"
+          Write-Output "SHA-256: $hash"
+          Get-Content $resultPath -Raw
       - uses: actions/upload-artifact@v4
         with:
           name: PhoneDrop-Windows
@@ -99,6 +101,23 @@ jobs:
         with:
           name: PhoneDrop-Windows
           path: artifact
+      - name: Verify downloaded executable before publishing
+        working-directory: .
+        shell: python
+        run: |
+          import hashlib, json
+          from pathlib import Path
+          artifact = Path('artifact')
+          exe = artifact / 'dist/PhoneDrop.exe'
+          data = exe.read_bytes()
+          digest = hashlib.sha256(data).hexdigest()
+          expected = (artifact / 'dist/PhoneDrop.exe.sha256').read_text().split()[0]
+          result = json.loads((artifact / 'smoke-result.json').read_text())
+          assert data[:2] == b'MZ' and 5 * 1024**2 <= len(data) <= 250 * 1024**2
+          assert digest == expected
+          assert all(result.get(key) is True for key in ('ok', 'tk', 'qr', 'tls', 'desktop_ui', 'http_upload'))
+          print(f'PhoneDrop.exe: {len(data)} bytes; SHA-256 {digest}')
+          print(json.dumps(result))
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'phonedrop-v1.0.0' }}
@@ -107,7 +126,22 @@ jobs:
           make_latest: false
           overwrite_files: false
           fail_on_unmatched_files: true
-          generate_release_notes: true
+          generate_release_notes: false
+          body: |
+            ## PhoneDrop 1.0.0 — Windows 64-bit
+
+            Tải PhoneDrop.exe, mở trên máy tính, quét QR bằng điện thoại cùng mạng Wi-Fi/LAN và bấm Cho phép trên PC. Không cần cài Python. Máy tính dùng Ethernet vẫn được nếu điện thoại truy cập được cùng mạng nội bộ.
+
+            - Giao diện tiếng Việt, nền tối; chọn nhiều file, xem tiến trình và kết quả từng file.
+            - Phiên nhận tối đa 12 giờ; bấm Ngắt kết nối bất cứ lúc nào. File hoàn tất được giữ lại, file dở bị hủy.
+            - Tối đa 5 GiB/file, gửi tuần tự, không ghi đè file cũ. QR dùng một lần; PC phải duyệt trước khi nhận.
+            - Cài đặt IP, thư mục nhận và HTTPS với chứng chỉ tự ký; không cần cấu hình router.
+
+            Kiểm chứng tự động: 129 test Python và 11 test mobile JavaScript trên Windows/Linux, gồm HTTP/HTTPS thật. Chính EXE đã chạy smoke test giao diện Tkinter, QR, duyệt, tiến trình, bố cục hẹp, ngắt phiên và nhận file HTTP trên Windows. Artifact tải lại được kiểm tra MZ và SHA-256 trước khi phát hành.
+
+            Đây là ứng dụng LAN, chưa gửi qua Internet/4G khác mạng. HTTP mặc định không mã hóa; chỉ dùng mạng tin cậy. EXE chưa ký nhà phát hành. Kiểm thử điện thoại thật, DPI và đợt 500 file/~5 GB vẫn cần nghiệm thu; test hiện có dùng file nhỏ và thời gian mô phỏng. Chưa hỗ trợ tiếp tục file đang gửi dở.
+
+            Đối chiếu checksum: Get-FileHash .\PhoneDrop.exe -Algorithm SHA256 với PhoneDrop.exe.sha256 đi kèm.
           files: |
             artifact/dist/PhoneDrop.exe
             artifact/dist/PhoneDrop.exe.sha256

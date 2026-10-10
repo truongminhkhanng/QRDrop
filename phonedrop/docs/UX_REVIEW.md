@@ -27,12 +27,12 @@ Mặc định cục bộ tăng từ 20 phút lên 12 giờ để hỗ trợ đ�
 
 ## Kiểm chứng
 
-- 126 test Python không socket đã qua, gồm snapshot tiến trình, thời gian phiên, ràng buộc dung lượng và các test bảo mật cũ.
+- 129 test Python đã qua trên Windows/Linux CI, gồm HTTP/HTTPS thật, gồm snapshot tiến trình, thời gian phiên, ràng buộc dung lượng và các test bảo mật cũ.
 - 11 test JavaScript chạy mã trang mobile: chờ duyệt, tên file không thành HTML, chọn nhiều file, chống gửi trùng batch, giới hạn dung lượng, ngắt phiên, lỗi mạng và phục hồi polling.
 - Các test mới kiểm tra 500 file tuần tự với dữ liệu nhỏ/thời gian mô phỏng, giới hạn metadata 500 MiB/5 GiB và ngắt giữa upload; chưa truyền 5 GB từ điện thoại thật.
 - Python compileall, JavaScript syntax, JavaScript preview và YAML workflow đã kiểm tra.
 - CI của source cũ c4f2cff5 đã qua115 test trên Windows/Linux, gồm HTTP/HTTPS thật. Run37938480572 dừng do quoting PowerShell ở bước syntax JS; đã sửa cục bộ thành script Python riêng.
-- Smoke test exe đã được mở rộng để tạo đúng PhoneDropApp, mở Cài đặt, bấm Cho phép, kiểm tra progress50%, gửi HTTP, kiểm tra log, thu cửa sổ640×500 và ngắt phiên. Chưa chạy cho source mới vì thiếu Tkinter/Pillow/qrcode ở máy hiện tại và CI của source mới chưa hoàn tất.
+- Smoke test exe đã được mở rộng để tạo đúng PhoneDropApp, mở Cài đặt, bấm Cho phép, kiểm tra progress50%, gửi HTTP, kiểm tra log, thu cửa sổ640×500 và ngắt phiên. Đã chạy thành công trong EXE trên Windows CI38055824859. Kiểm tra bằng mắt trên máy người dùng và các mức DPI vẫn còn.
 
 ## Còn cần kiểm tra native
 

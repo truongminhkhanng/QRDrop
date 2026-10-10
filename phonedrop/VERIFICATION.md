@@ -4,9 +4,11 @@
 
 Source cục bộ có phiên nhận tối đa 12 giờ, timeout gửi mobile lấy từ cùng cấu hình server, đồng hồ giờ:phút:giây và ngắt thủ công. 12 giờ là mặc định agent chọn khi tiếp tục yêu cầu kéo dài phiên; chưa phải thời lượng user xác nhận riêng. QR 120 giây và chờ duyệt 60 giây giữ nguyên.
 
-**Chưa hoàn tất bản phát hành Windows:** source mới chưa chạy CI/native, chưa có PhoneDrop.exe được xác minh, chưa kiểm thử điện thoại thật. Sau khi nhận bản xem trước và câu hỏi tiếp tục GitHub/EXE, user yêu cầu “AGENT.md Làm xong cho tao đi”; agent tiếp tục upload và CI theo chỉ dẫn đó. Điều này không phải bằng chứng user đã kiểm tra trực quan native UI. Xem [bản xem trước](docs/ux-preview.html) và [bản mô tả UX](docs/UX_REVIEW.md).
+**Đã tạo và chạy thử EXE trên Windows CI.** [Run 38055824859](https://github.com/truongminhkhanng/QRDrop/actions/runs/38055824859) của source `711c2b78d2e173d884bf2959fc5b4bfdc6f836f6` xanh: 129 pytest và 11 JavaScript pass trên cả Windows/Linux. EXE 23.495.597 byte vượt qua smoke test Tkinter/QR/TLS, mở Cài đặt, duyệt, progress, upload HTTP, lịch sử file, bố cục hẹp và ngắt phiên. Artifact ID 11671785953. Không gán bằng chứng này cho điện thoại thật hoặc mọi DPI.
 
-## Đã kiểm tra trên source hiện tại
+Sau khi nhận bản xem trước và câu hỏi tiếp tục GitHub/EXE, user yêu cầu “AGENT.md Làm xong cho tao đi”; agent tiếp tục upload và CI theo chỉ dẫn đó. Xem [bản xem trước](docs/ux-preview.html) và [bản mô tả UX](docs/UX_REVIEW.md).
+
+## Kiểm tra cục bộ bổ sung
 
 - `python3 -m pytest -q -m 'not network'`: **126 passed, 3 deselected**.
 - `node tests/mobile-ui.test.cjs`: **11 passed**. Test nạp HTML đã được Python tạo để kiểm tra đúng timeout trong trang được phục vụ; `node --test tests/mobile-ui.test.cjs` cũng exit 0 (Node 26 ở môi trường này gộp báo cáo theo file).
@@ -32,10 +34,10 @@ Chạy toàn bộ pytest trước khi sửa: 121 pass, 2 errors và 1 failed. C�
 
 Tkinter, Pillow, qrcode và PyInstaller vẫn không có trong môi trường hiện tại. Không có bằng chứng chạy native GUI hay đóng gói tại đây; Linux không tạo được Windows EXE bằng PyInstaller. Codeintel status/update cũng không chạy do thiếu TypeScript; việc sửa dựa trên đọc source và kiểm thử trực tiếp.
 
-## CI trước đây và bước còn lại
+## CI trước đây và phát hành
 
 [Run 37938480572](https://github.com/truongminhkhanng/QRDrop/actions/runs/37938480572) của source cũ `c4f2cff53815d66ca8e140c23b67408553178d04` đã được kiểm tra ở phiên trước: 115 pytest pass trên Windows/Linux, gồm HTTP/HTTPS. Windows job dừng tại quoting PowerShell của bước JavaScript. Bản sửa cục bộ dùng `tools/check_mobile.py`; không gán kết quả run cũ cho source hiện tại.
 
-Bước tiếp theo: đưa đúng thư mục `phonedrop/` và workflow gốc `.github/workflows/phonedrop.yml` lên nhánh `feature/phonedrop` của repo `truongminhkhanng/QRDrop`. Không thay toàn bộ cây QRDrop bằng Git độc lập trong phonedrop. Theo dõi test Linux/Windows và smoke test executable (Tk, desktop UI, QR, TLS, HTTP upload), tải artifact rồi xác minh MZ, SHA-256 và chạy trên Windows. Chỉ phát hành bằng tag riêng `phonedrop-v1.0.0` sau khi thành công; giữ nguyên release QRDrop.
+Source hiện tại đã ở nhánh `feature/phonedrop` của `truongminhkhanng/QRDrop`; mọi file ngoài PhoneDrop và workflow riêng được đối chiếu giữ nguyên. Không thay toàn bộ cây QRDrop bằng Git độc lập trong phonedrop. Workflow phát hành chạy lại test/build, tải artifact vào release job và kiểm tra MZ, SHA-256, smoke-result trước khi công bố. Connector đã tải thành công artifact của run38055824859; tải tiếp về VPS bị DNS chặn, nên bằng chứng kiểm tra binary tại runner được ghi rõ trong log CI. Chỉ phát hành bằng tag riêng `phonedrop-v1.0.0` sau khi thành công; giữ nguyên release QRDrop.
 
 Kiểm tra tiếp Android/iPhone trên Wi-Fi ↔ Ethernet, 500 file/~5 GB thật, ngắt/hết hạn giữa upload, Firewall, DPI 125–200%, QR camera, keyboard và HTTPS fingerprint. Không coi preview hay test dữ liệu nhỏ là bằng chứng cho những bước này.
