@@ -1,0 +1,47 @@
+name: Mark PhoneDrop official release as latest
+
+on:
+  push:
+    branches: [release/phonedrop-publish]
+    paths: ['.github/workflows/phonedrop-publish.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Promote the verified release without replacing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PHONE_DROP_REPO: ${{ github.repository }}
+        shell: python
+        run: |
+          import json, os, subprocess
+          repo = os.environ['PHONE_DROP_REPO']
+          tag = 'phonedrop-v1.0.0'
+          def api(path):
+              return json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/{path}']))
+          def assets(release):
+              return sorted((a['id'], a['name'], a['size'], a['digest']) for a in release['assets'])
+          before = api(f'releases/tags/{tag}')
+          assert before['id'] == 408972650
+          assert api(f'git/ref/tags/{tag}')['object']['sha'] == '930cffce8ec690a7d18c8e361dbbf068ecfdbac7'
+          assert api('actions/runs/38056125984')['conclusion'] == 'success'
+          exe = next(a for a in before['assets'] if a['name'] == 'PhoneDrop.exe')
+          assert exe['digest'] == 'sha256:ae1a602c00805a397334b770a5c384433fc6d9f81d8ee5922886463fa638fe2c'
+          protected = {t: assets(api(f'releases/tags/{t}')) for t in ('v1.0.0', 'v0.1.0')}
+          subprocess.run(['gh', 'release', 'edit', tag, '--repo', repo, '--verify-tag',
+                          '--draft=false', '--prerelease=false', '--latest'], check=True)
+          after = api(f'releases/tags/{tag}')
+          assert after['id'] == before['id'] and assets(after) == assets(before)
+          assert after['body'] == before['body']
+          assert not after['draft'] and not after['prerelease']
+          assert api('releases/latest')['id'] == after['id']
+          for t, original in protected.items():
+              assert assets(api(f'releases/tags/{t}')) == original
+          print('PhoneDrop 1.0.0 is the official Latest release; existing assets preserved.')
+          print(after['html_url'])
