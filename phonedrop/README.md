@@ -1,10 +1,12 @@
-# PhoneDrop
+# PhoneDrop 1.0.1
 
 Ứng dụng Windows dùng Python 3.12 + Tkinter để nhận file từ trình duyệt điện thoại qua Wi-Fi/LAN. Điện thoại không cần cài app; trang tiếng Việt, dark mode, không CDN, không truy cập Internet khi chuyển file.
 
 ## Trạng thái bản source này
 
-Đã tạo EXE và chạy smoke test thành công trên Windows trong [CI38055824859](https://github.com/truongminhkhanng/QRDrop/actions/runs/38055824859); 129 test Python và 11 test JavaScript đạt trên Windows/Linux. Xem `VERIFICATION.md` để biết chính xác phần đã chạy và phần bị môi trường chặn. Chỉ coi bản `.exe` được xác minh khi workflow **Test and build PhoneDrop** xanh, gồm cả smoke test chạy chính executable. Source chưa được chứng minh hoạt động trên điện thoại thật.
+Bản 1.0.0 đã tạo EXE và chạy smoke test thành công trên Windows trong [CI38055824859](https://github.com/truongminhkhanng/QRDrop/actions/runs/38055824859); 129 test Python và 11 test JavaScript đạt trên Windows/Linux. Xem `VERIFICATION.md` để biết chính xác phần đã chạy và phần bị môi trường chặn. Chỉ coi bản `.exe` được xác minh khi workflow **Test and build PhoneDrop** xanh, gồm cả smoke test chạy chính executable. Source chưa được chứng minh hoạt động trên điện thoại thật.
+
+Source hiện tại là **1.0.1**; số phiên bản hiện trên thanh tiêu đề PC. Xem [lịch sử thay đổi](CHANGELOG.md). Workflow kiểm tra số phiên bản trong EXE khớp tag trước khi phát hành.
 
 ## Cách dùng trên Windows
 
@@ -122,7 +124,7 @@ python -m pytest -q
 
 Workflow PhoneDrop chạy khi push `main`, `feature/phonedrop`, nhánh `release/phonedrop-v*` có thay đổi source/workflow PhoneDrop, khi push tag `phonedrop-v*`, hoặc workflow_dispatch. Build và smoke test phải xanh trước khi phát hành. Mỗi bản cập nhật ứng dụng được phát hành bằng **số phiên bản mới** và tự đặt làm bản chính thức **Latest**. Ví dụ sửa lỗi sau 1.0.0 dùng 1.0.1 rồi 1.0.2; tính năng lớn dùng phiên bản minor mới.
 
-Tạo nhánh `release/phonedrop-vMAJOR.MINOR.PATCH` từ source đã hoàn thiện, hoặc đẩy tag cùng tên. Workflow lấy tag, tiêu đề và số phiên bản trực tiếp từ ref; không cố định 1.0.0. Bước kiểm tra đọc toàn bộ danh sách Releases, chặn số đã tồn tại hoặc thấp hơn, và kiểm tra tag có sẵn trỏ đúng commit. Lỗi đọc GitHub dừng phát hành. Chạy lại bản đã công bố không ghi đè asset; chọn phiên bản mới cho thay đổi tiếp theo. Các lần phát hành được tuần tự hóa để bản cũ không đẩy bản mới khỏi Latest.
+Cập nhật `APP_VERSION` trong `version.py` và `CHANGELOG.md`, rồi tạo nhánh `release/phonedrop-vMAJOR.MINOR.PATCH` từ source đã hoàn thiện, hoặc đẩy tag cùng tên. Workflow lấy tag, tiêu đề và số phiên bản trực tiếp từ ref; không cố định 1.0.0. Bước kiểm tra đọc toàn bộ danh sách Releases, chặn số đã tồn tại hoặc thấp hơn, và kiểm tra tag có sẵn trỏ đúng commit. Lỗi đọc GitHub dừng phát hành. Chạy lại bản đã công bố không ghi đè asset; chọn phiên bản mới cho thay đổi tiếp theo. Các lần phát hành được tuần tự hóa để bản cũ không đẩy bản mới khỏi Latest.
 
 Giữ phiên bản cũ để tra cứu hoặc quay lại khi cần. Link [bản mới nhất](https://github.com/truongminhkhanng/QRDrop/releases/latest) luôn trỏ tới bản được đánh dấu Latest. Tag có tiền tố để phân biệt với release QRDrop đã có. Repo hiện public nên source và bản phát hành PhoneDrop có thể truy cập công khai. Workflow `phonedrop-publish.yml` là thao tác một lần cho bản 1.0.0, không dùng lại cho các bản cập nhật.
 

@@ -113,8 +113,10 @@ jobs:
       - name: Verify downloaded executable before publishing
         working-directory: .
         shell: python
+        env:
+          PHONE_DROP_RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          import hashlib, json
+          import hashlib, json, os
           from pathlib import Path
           artifact = Path('artifact')
           exe = artifact / 'dist/PhoneDrop.exe'
@@ -124,6 +126,7 @@ jobs:
           result = json.loads((artifact / 'smoke-result.json').read_text())
           assert data[:2] == b'MZ' and 5 * 1024**2 <= len(data) <= 250 * 1024**2
           assert digest == expected
+          assert result.get('version') == os.environ['PHONE_DROP_RELEASE_VERSION']
           assert all(result.get(key) is True for key in ('ok', 'tk', 'qr', 'tls', 'desktop_ui', 'http_upload'))
           print(f'PhoneDrop.exe: {len(data)} bytes; SHA-256 {digest}')
           print(json.dumps(result))
@@ -140,6 +143,8 @@ jobs:
           generate_release_notes: false
           body: |
             ## PhoneDrop ${{ steps.version.outputs.version }} — Windows 64-bit
+
+            Thay đổi của phiên bản này: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/phonedrop/CHANGELOG.md
 
             Tải PhoneDrop.exe, mở trên máy tính, quét QR bằng điện thoại cùng mạng Wi-Fi/LAN và bấm Cho phép trên PC. Không cần cài Python. Máy tính dùng Ethernet vẫn được nếu điện thoại truy cập được cùng mạng nội bộ.
 

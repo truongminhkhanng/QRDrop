@@ -40,6 +40,7 @@ def test_all_previous_versions_are_checked_not_only_latest_or_first():
 
 @pytest.mark.parametrize('tag_commit', ['tested-commit', 'different-commit'])
 def test_existing_unpublished_tag_must_match_tested_commit(tmp_path, monkeypatch, tag_commit):
+    monkeypatch.setattr(release_version, 'APP_VERSION', '1.0.1')
     output = tmp_path / 'outputs'
     for key, value in {'GITHUB_REF': 'refs/tags/phonedrop-v1.0.1',
                        'GITHUB_REPOSITORY': 'owner/repo', 'GITHUB_SHA': 'tested-commit',
@@ -58,6 +59,7 @@ def test_existing_unpublished_tag_must_match_tested_commit(tmp_path, monkeypatch
 
 
 def test_github_failure_stops_release_without_writing_outputs(tmp_path, monkeypatch):
+    monkeypatch.setattr(release_version, 'APP_VERSION', '1.0.1')
     output = tmp_path / 'outputs'
     monkeypatch.setenv('GITHUB_REF', 'refs/heads/release/phonedrop-v1.0.1')
     monkeypatch.setenv('GITHUB_REPOSITORY', 'owner/repo')
@@ -66,5 +68,17 @@ def test_github_failure_stops_release_without_writing_outputs(tmp_path, monkeypa
         raise release_version.subprocess.CalledProcessError(1, 'gh')
     monkeypatch.setattr(release_version.subprocess, 'check_output', unavailable)
     with pytest.raises(release_version.subprocess.CalledProcessError):
+        release_version.main()
+    assert not output.exists()
+
+
+def test_release_version_must_match_application_before_api_access(tmp_path, monkeypatch):
+    output = tmp_path / 'outputs'
+    monkeypatch.setattr(release_version, 'APP_VERSION', '1.0.1')
+    monkeypatch.setenv('GITHUB_REF', 'refs/heads/release/phonedrop-v1.0.2')
+    monkeypatch.setenv('GITHUB_OUTPUT', str(output))
+    monkeypatch.setattr(release_version.subprocess, 'check_output',
+                        lambda *args, **kwargs: pytest.fail('Must reject before calling GitHub'))
+    with pytest.raises(ValueError, match='does not match'):
         release_version.main()
     assert not output.exists()

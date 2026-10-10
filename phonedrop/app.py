@@ -9,6 +9,7 @@ import sys
 import threading
 
 from core import PhoneDropServer, SESSION_SECONDS, State
+from version import APP_VERSION
 from viewmodel import change_executable_policy
 
 MOBILE_HTML = r'''<!doctype html>
@@ -172,6 +173,7 @@ def smoke_test(output: Path):
         try:
             ui.refresh()
             root.update()
+            assert root.title() == f'PhoneDrop {APP_VERSION}'
             assert ui.photo and ui.photo.width() > 0 and context and certificate.exists()
             ui.open_settings()
             root.update()
@@ -209,7 +211,7 @@ def smoke_test(output: Path):
             assert state.session is None
         finally:
             ui.close()
-    output.write_text(json.dumps({'ok': True, 'python': sys.version.split()[0],
+    output.write_text(json.dumps({'ok': True, 'version': APP_VERSION, 'python': sys.version.split()[0],
                                   'tk': True, 'qr': True, 'tls': bool(fingerprint),
                                   'desktop_ui': True, 'http_upload': True}), encoding='utf-8')
 

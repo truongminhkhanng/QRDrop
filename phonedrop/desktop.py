@@ -16,6 +16,7 @@ import qrcode
 
 from core import PhoneDropServer, State, discover_lan_ips, lan_ipv4
 from tls_support import create_tls_context
+from version import APP_VERSION
 from viewmodel import COLORS, change_executable_policy, dashboard, format_size, initial_geometry
 
 
@@ -36,7 +37,7 @@ class PhoneDropApp:
         self.ip = self.addresses[0] if self.addresses else ''
         self.https = False
         self._style()
-        root.title('PhoneDrop')
+        root.title(f'PhoneDrop {APP_VERSION}')
         width, height = initial_geometry(root.winfo_screenwidth(), root.winfo_screenheight())
         root.geometry(f'{width}x{height}')
         root.minsize(min(600, width), min(450, height))

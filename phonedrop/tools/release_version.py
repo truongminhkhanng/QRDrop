@@ -4,6 +4,10 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from version import APP_VERSION
 
 
 TAG = re.compile(r'phonedrop-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)')
@@ -31,6 +35,8 @@ def require_newer(tag, existing):
 
 def main():
     tag = release_tag(os.environ['GITHUB_REF'])
+    if tag != f'phonedrop-v{APP_VERSION}':
+        raise ValueError('Release version does not match version.py; update the application version first.')
     repo = os.environ['GITHUB_REPOSITORY']
 
     def gh(*args):
