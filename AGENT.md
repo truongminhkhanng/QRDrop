@@ -35,6 +35,12 @@ Chỉ giữ nguyên khi user nói rõ “giữ nguyên câu này”, “để đ
 - Native folder APIs; no shell with user data. Remote pages get no Tauri IPC permissions.
 - Build success is not phone-to-desktop end-to-end evidence. State verification gaps explicitly.
 
+## PhoneDrop release policy — 2026-10-10
+- Standing user instruction: every delivered PhoneDrop update gets a new version and becomes the official **Latest** release. After required tests/build/smoke pass, publish it without asking again solely for version increment or Latest promotion.
+- Inspect existing PhoneDrop releases first. Increment the patch for fixes/small updates (1.0.0 → 1.0.1 → 1.0.2); use minor/major increments when warranted. Do not reuse a published version, move its tag, replace its assets or delete older releases unless explicitly requested.
+- Shared-repo tag: `phonedrop-vMAJOR.MINOR.PATCH`; release branch: `release/phonedrop-vMAJOR.MINOR.PATCH`. Use `.github/workflows/phonedrop.yml`; it derives the title/tag from the ref, rejects existing/older release numbers and promotes a successful new release to Latest. The one-time `phonedrop-publish.yml` workflow was only for the original1.0.0 promotion; do not use it for subsequent updates.
+- Keep QRDrop versions/assets separate. Development commits and documentation/pipeline-only maintenance may be verified without manufacturing a new application release; each delivered app update must use a new version. Record its changes and link to verified CI.
+
 ## UI micro-change
 Visible element → route/entry → component → applied class/style/token → actual declaration → shared usage/impact → minimal patch → appropriate UI/build verification. A Header-only request must not modify a token used by Button/Footer/Alert.
 

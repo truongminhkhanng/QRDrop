@@ -2,7 +2,7 @@ name: Test and build PhoneDrop
 
 on:
   push:
-    branches: [main, feature/phonedrop, release/phonedrop-v1.0.0]
+    branches: [main, feature/phonedrop, 'release/phonedrop-v*']
     paths:
       - 'phonedrop/**'
       - '.github/workflows/phonedrop.yml'
@@ -90,13 +90,22 @@ jobs:
 
   release:
     name: Release tagged executable
-    if: startsWith(github.ref, 'refs/tags/phonedrop-v') || github.ref == 'refs/heads/release/phonedrop-v1.0.0'
+    if: startsWith(github.ref, 'refs/tags/phonedrop-v') || startsWith(github.ref, 'refs/heads/release/phonedrop-v')
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
+    concurrency:
+      group: phonedrop-official-release
+      cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v4
+      - name: Require a new version for this update
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/release_version.py
       - uses: actions/download-artifact@v4
         with:
           name: PhoneDrop-Windows
@@ -120,15 +129,17 @@ jobs:
           print(json.dumps(result))
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'phonedrop-v1.0.0' }}
+          tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: PhoneDrop 1.0.0
-          make_latest: false
+          name: PhoneDrop ${{ steps.version.outputs.version }}
+          make_latest: true
+          draft: false
+          prerelease: false
           overwrite_files: false
           fail_on_unmatched_files: true
           generate_release_notes: false
           body: |
-            ## PhoneDrop 1.0.0 — Windows 64-bit
+            ## PhoneDrop ${{ steps.version.outputs.version }} — Windows 64-bit
 
             Tải PhoneDrop.exe, mở trên máy tính, quét QR bằng điện thoại cùng mạng Wi-Fi/LAN và bấm Cho phép trên PC. Không cần cài Python. Máy tính dùng Ethernet vẫn được nếu điện thoại truy cập được cùng mạng nội bộ.
 
@@ -137,7 +148,7 @@ jobs:
             - Tối đa 5 GiB/file, gửi tuần tự, không ghi đè file cũ. QR dùng một lần; PC phải duyệt trước khi nhận.
             - Cài đặt IP, thư mục nhận và HTTPS với chứng chỉ tự ký; không cần cấu hình router.
 
-            Kiểm chứng tự động: 129 test Python và 11 test mobile JavaScript trên Windows/Linux, gồm HTTP/HTTPS thật. Chính EXE đã chạy smoke test giao diện Tkinter, QR, duyệt, tiến trình, bố cục hẹp, ngắt phiên và nhận file HTTP trên Windows. Artifact tải lại được kiểm tra MZ và SHA-256 trước khi phát hành.
+            Kiểm chứng tự động: test Python và mobile JavaScript trên Windows/Linux, gồm HTTP/HTTPS thật. Chính EXE đã chạy smoke test giao diện Tkinter, QR, duyệt, tiến trình, bố cục hẹp, ngắt phiên và nhận file HTTP trên Windows. Artifact tải lại được kiểm tra MZ và SHA-256 trước khi phát hành. Chi tiết lần kiểm tra: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             Đây là ứng dụng LAN, chưa gửi qua Internet/4G khác mạng. HTTP mặc định không mã hóa; chỉ dùng mạng tin cậy. EXE chưa ký nhà phát hành. Kiểm thử điện thoại thật, DPI và đợt 500 file/~5 GB vẫn cần nghiệm thu; test hiện có dùng file nhỏ và thời gian mô phỏng. Chưa hỗ trợ tiếp tục file đang gửi dở.
 
