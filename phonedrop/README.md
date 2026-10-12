@@ -1,4 +1,4 @@
-# PhoneDrop 1.0.1
+# PhoneDrop 1.0.2
 
 Ứng dụng Windows dùng Python 3.12 + Tkinter để nhận file từ trình duyệt điện thoại qua Wi-Fi/LAN. Điện thoại không cần cài app; trang tiếng Việt, dark mode, không CDN, không truy cập Internet khi chuyển file.
 
@@ -6,17 +6,17 @@
 
 Bản 1.0.0 đã tạo EXE và chạy smoke test thành công trên Windows trong [CI38055824859](https://github.com/truongminhkhanng/QRDrop/actions/runs/38055824859); 129 test Python và 11 test JavaScript đạt trên Windows/Linux. Xem `VERIFICATION.md` để biết chính xác phần đã chạy và phần bị môi trường chặn. Chỉ coi bản `.exe` được xác minh khi workflow **Test and build PhoneDrop** xanh, gồm cả smoke test chạy chính executable. Source chưa được chứng minh hoạt động trên điện thoại thật.
 
-Source hiện tại là **1.0.1**; số phiên bản hiện trên thanh tiêu đề PC. Xem [lịch sử thay đổi](CHANGELOG.md). Workflow kiểm tra số phiên bản trong EXE khớp tag trước khi phát hành.
+Source hiện tại là **1.0.2**; số phiên bản hiện trên thanh tiêu đề PC. Xem [lịch sử thay đổi](CHANGELOG.md). Workflow kiểm tra số phiên bản trong EXE khớp tag trước khi phát hành.
 
 ## Cách dùng trên Windows
 
 1. Tải `PhoneDrop.exe` từ Release của repo hoặc giải nén artifact `PhoneDrop-Windows` trong Actions. Đối chiếu SHA-256 với `PhoneDrop.exe.sha256` bằng `Get-FileHash .\PhoneDrop.exe -Algorithm SHA256`.
-2. Chạy app bằng tài khoản thường, không cần Administrator. Máy tính tự chọn IPv4 LAN và mở cổng ngẫu nhiên **chỉ trên IP đó**. Nếu nhiều card mạng/VPN, mở **Cài đặt**, chọn hoặc nhập IP của card Wi-Fi/Ethernet đúng rồi bấm **Áp dụng**. Không có IP LAN hợp lệ thì app không mở listener.
+2. Chạy app bằng tài khoản thường, không cần Administrator. Ứng dụng khởi động với nhận file **đang tắt**. Bấm **Bật nhận file** để mở cổng ngẫu nhiên **chỉ trên IPv4 LAN đã chọn**. Nếu nhiều card mạng/VPN, mở **Cài đặt**, chọn hoặc nhập IP của card Wi-Fi/Ethernet đúng rồi bấm **Áp dụng**. Không có IP LAN hợp lệ thì app không mở listener.
 3. Điện thoại kết nối cùng mạng nội bộ có thể truy cập máy tính. Máy tính cắm Ethernet vẫn dùng được nếu điện thoại Wi-Fi cùng mạng và router cho phép liên lạc giữa hai thiết bị.
 4. Quét QR. Trang hiện **Đang chờ máy tính xác nhận**. Máy tính hiện cửa sổ trên cùng, gồm IP, User-Agent, **Cho phép / Từ chối**. Chỉ cho phép nếu bạn vừa quét. Quá 60 giây tự từ chối; đóng hộp thoại cũng là từ chối.
 5. Sau khi cho phép, chọn nhiều file và bấm **Gửi file**. File gửi tuần tự; mỗi file có tiến trình và kết quả **Xong / Lỗi**. Giữ màn hình điện thoại và trang web hoạt động trong lúc gửi.
 6. File vào `~/Downloads/PhoneDrop`. Trong **Cài đặt**, **Đổi thư mục** chọn thư mục đang tồn tại; bấm **Áp dụng** để đổi và hủy phiên cũ; **Mở thư mục** dùng trình quản lý file hệ điều hành. App không tự mở file nhận được. Danh sách trong app giữ 200 file gần nhất của lần chạy hiện tại.
-7. **Tạo QR mới** khi đang chờ hoặc **Ngắt kết nối** khi có thiết bị thu hồi phiên ngay, đóng socket upload đang chạy và dọn `.part` đang sở hữu. File đã hoàn thành được giữ lại. QR mới sẵn sàng cho lần ghép nối tiếp; để ngừng listener hoàn toàn, đóng app.
+7. **Tạo QR mới** khi đang chờ hoặc **Ngắt kết nối** khi có thiết bị thu hồi phiên ngay, đóng socket upload đang chạy và dọn `.part` đang sở hữu. File đã hoàn thành được giữ lại. QR mới sẵn sàng cho lần ghép nối tiếp. Bấm **Tắt nhận file** để đóng hoàn toàn kết nối mà vẫn giữ cửa sổ app; bấm **Bật nhận file** để nhận lại bằng QR mới. Đóng cửa sổ sẽ thoát app và dừng nhận.
 
 QR dùng một lần, hết hạn sau 120 giây và tự đổi nếu chưa quét. Sau khi quét, QR được ẩn trong lúc chờ/đã duyệt. Phiên được duyệt sống tối đa **12 giờ** kể từ lúc duyệt; polling và gửi thêm file không gia hạn. Có thể bấm **Ngắt kết nối** bất cứ lúc nào. Phiên hết hạn giữa lúc gửi sẽ hủy file chưa hoàn thành và giữ file đã nhận xong. Reload trang sau khi token đã dùng không khôi phục phiên: tạo/quét QR mới. Mỗi lần chỉ một phiên và một file đang ghi.
 
@@ -37,6 +37,14 @@ python tools/check_mobile.py
 node --test tests/mobile-ui.test.cjs
 ```
 
+## Khi URL không mở được
+
+- Dùng **Sao chép liên kết** hoặc QR hiện tại. Liên kết đầy đủ có mã ghép nối; không chia sẻ mã này công khai. IP:cổng hiển thị dưới QR dùng để kiểm tra, không tự cho phép gửi file.
+- **Kiểm tra trên PC** mở trang xác nhận kết nối trong trình duyệt máy tính, không tiêu thụ mã QR. Mở trang thành công trên PC chỉ chứng minh kết nối cục bộ. Mở cùng IP:cổng trên điện thoại để kiểm tra đường mạng từ điện thoại.
+- Điện thoại cần Wi-Fi cùng mạng LAN truy cập được PC; PC có thể dùng Ethernet. 4G/5G khác mạng chưa được hỗ trợ.
+- Mở **Cài đặt** để làm mới danh sách IP và chọn đúng Wi-Fi/Ethernet. Kiểm tra VPN, Wi-Fi khách/cách ly thiết bị và quyền PhoneDrop trong Windows Firewall cho mạng riêng. Không cần tắt toàn bộ Firewall hoặc forward port.
+- Áp dụng cài đặt khi đang tắt giữ nguyên trạng thái tắt. Khi đang bật, thao tác này hủy phiên cũ và mở QR mới.
+
 ## HTTPS tùy chọn
 
 Trong **Cài đặt**, bật **Dùng HTTPS với chứng chỉ tự ký**, rồi bấm **Áp dụng**. Thao tác này khởi động lại server, hủy phiên cũ, tạo khóa ECDSA P-256/chứng chỉ mới ngẫu nhiên và đổi QR. Chứng chỉ có IP SAN đúng IP LAN, dùng TLS từ 1.2; hiệu lực 2 ngày. Khóa riêng trên đĩa được xóa ngay sau khi nạp vào SSLContext; chứng chỉ tạm được dọn khi đóng server bình thường. Nếu giữ server quá 2 ngày, khởi động lại để có chứng chỉ mới.
@@ -49,7 +57,7 @@ Chứng chỉ/fingerprint đổi khi restart server hoặc đổi IP/chế độ
 
 - Token QR tạo bằng `secrets.token_urlsafe(16)` (128 bit), một lần/120 giây; so sánh bằng `secrets.compare_digest`. Session dùng `token_urlsafe(32)` (256 bit), gắn IP và trạng thái duyệt. IP/User-Agent có thể gây nhầm lẫn hoặc giả mạo; chúng không thay thế bí mật session.
 - Mọi `/status` kiểm tra session và IP. **Ngoại lệ cần thiết cho giao diện chờ:** phiên đúng nhưng chưa duyệt nhận HTTP 202 với `pending`; chỉ `approved` nhận HTTP 200. `/upload` luôn đòi phiên đã duyệt. Không có API mạng nào để duyệt, thay thư mục hoặc bật nhận executable.
-- Chỉ `GET /?t=...`, `GET /status`, `POST /upload`. Không đọc file, liệt kê thư mục, chạy lệnh hay phục vụ source. Host phải đúng IP:cổng; Origin nếu có phải đúng; upload bắt buộc Origin đúng và session ở header. Không tin `X-Forwarded-For`; không CORS. CSP nonce, chống nhúng iframe và không chèn tên file bằng `innerHTML`.
+- Chỉ `GET /` (trang kiểm tra không có mã), `GET /?t=...`, `GET /status`, `POST /upload`. Không đọc file, liệt kê thư mục, chạy lệnh hay phục vụ source. Host phải đúng IP:cổng; Origin nếu có phải đúng; upload bắt buộc Origin đúng và session ở header. Không tin `X-Forwarded-For`; không CORS. CSP nonce, chống nhúng iframe và không chèn tên file bằng `innerHTML`.
 - Tên file lấy basename cho cả `/` và `\`, chuẩn hóa Unicode, thay ký tự cấm/control/bidi, xử lý tên thiết bị Windows, giới hạn 150 ký tự và 240 byte UTF-8. Đuôi file được giữ khi cắt. Không cho đường dẫn từ điện thoại quyết định thư mục ghi.
 - Mặc định chặn: `.exe .msi .bat .cmd .com .scr .ps1 .psm1 .vbs .vbe .js .jse .wsf .wsh .jar .lnk .dll .reg .hta .cpl .msc .pif .appx .msix .sys`; thêm `.appxbundle .msixbundle .msp .mst .psd1 .scf .url .website .gadget`. Không phân biệt hoa/thường, chặn cả đuôi nguy hiểm bên trong tên kép. Checkbox **Cho phép file thực thi - NGUY HIỂM** nằm trong Cài đặt, mặc định tắt; Áp dụng để bật cần xác nhận và hủy phiên cũ.
 - Tối đa 5 GiB (5 × 1024³ byte)/file. Bắt buộc một `Content-Length` hợp lệ, không chunked encoding, không đọc quá độ dài khai báo. Stream mỗi lần tối đa 256 KiB. File 0 byte hợp lệ. Không có quota tổng phiên; người đã được duyệt có thể gửi nhiều file làm đầy ổ đĩa.

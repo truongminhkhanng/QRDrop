@@ -56,11 +56,11 @@ body{margin:0;padding:24px}h1{font-size:27px;margin:4px 0}p{line-height:1.55;col
 <div class="note"><strong>Bản mô phỏng ngoại tuyến — không phải ảnh chụp ứng dụng Windows.</strong>
 <p>Desktop minh họa bố cục mới. Khung điện thoại dùng HTML/JS của app, với mạng mô phỏng. Bạn có thể chọn file để thử giao diện; bản xem trước không đọc nội dung, không gửi và không lưu file.</p>
 <p>QR và dữ liệu file là minh họa. Giao diện ttk thực tế và DPI cần kiểm tra trên Windows trước khi phát hành.</p></div>
-<div class="toolbar"><label for="scenario">Trạng thái</label><select id="scenario"><option value="waiting">Sẵn sàng / Chưa quét QR</option><option value="pending">Điện thoại chờ xác nhận</option><option value="approved">Đã cho phép / Chọn file</option><option value="receiving">Đang nhận file</option><option value="complete">Nhận xong</option><option value="offline">Chưa có mạng</option></select>
+<div class="toolbar"><label for="scenario">Trạng thái</label><select id="scenario"><option value="waiting">Sẵn sàng / Chưa quét QR</option><option value="pending">Điện thoại chờ xác nhận</option><option value="approved">Đã cho phép / Chọn file</option><option value="receiving">Đang nhận file</option><option value="complete">Nhận xong</option><option value="offline">Đã tắt nhận file</option></select>
 <button id="small">Thử bố cục hẹp</button><button id="resetMobile">Làm mới khung điện thoại</button></div>
 <div class="layout"><section id="pc"><p class="caption">MÁY TÍNH · Bố cục theo trạng thái thực trong ứng dụng</p><div class="desktop">
 <div class="titlebar">PhoneDrop __APP_VERSION__ <span>— □ ×</span></div><div class="apphead"><div><h2>PhoneDrop</h2><p>Từ điện thoại đến máy tính của bạn</p></div><button id="settings">Cài đặt</button></div>
-<div class="content"><div class="card connect"><h3 id="heading"></h3><div class="qr" id="qr"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="none" stroke="#70d7bf" stroke-width="5" d="M6 36V6h30m28 0h30v30M6 64v30h30m28 0h30V64M27 27h15v15H27zM58 58h15v15H58z"/></svg><strong id="qrText">QR xem trước</strong><small id="qrHint">Không dùng để kết nối</small></div><p id="detail"></p><button id="action"></button></div>
+<div class="content"><div class="card connect"><h3 id="heading"></h3><div class="qr" id="qr"><svg viewBox="0 0 100 100" aria-hidden="true"><path fill="none" stroke="#70d7bf" stroke-width="5" d="M6 36V6h30m28 0h30v30M6 64v30h30m28 0h30V64M27 27h15v15H27zM58 58h15v15H58z"/></svg><strong id="qrText">QR xem trước</strong><small id="qrHint">Không dùng để kết nối</small></div><p id="detail"></p><button id="action"></button><button id="stop">Tắt nhận file</button><p>Địa chỉ IP:cổng hiển thị tại đây khi bật nhận.</p><p>Sao chép liên kết · Kiểm tra trên PC · Trợ giúp kết nối</p></div>
 <div class="card"><h3>Nhận file</h3><div class="transfer"><p id="transfer"></p><progress id="progress" max="100" value="0"></progress><p id="amount"></p></div><h3 id="receivedTitle">Đã nhận · 0 file</h3>
 <table class="table"><thead><tr><th>Tên file</th><th>Dung lượng</th></tr></thead><tbody id="receivedRows"></tbody></table><p id="empty" class="empty">File hoàn tất sẽ xuất hiện ở đây.</p>
 <div class="folder"><p>Thư mục nhận</p><div>Downloads / PhoneDrop</div><button id="openFolder">Mở thư mục</button></div></div></div>
@@ -70,22 +70,23 @@ body{margin:0;padding:24px}h1{font-size:27px;margin:4px 0}p{line-height:1.55;col
 </div></section><section><p class="caption">ĐIỆN THOẠI · Chọn trạng thái “Đã cho phép” để thử gửi</p><div class="phone"><iframe id="mobile" sandbox="allow-scripts" title="PhoneDrop trên điện thoại — mô phỏng ngoại tuyến"></iframe></div></section></div></div>
 <script>
 const views=__VIEWS__;const mobile=__MOBILE__;const simulator=__SIMULATOR__;
-const $=id=>document.getElementById(id);let mode='waiting';
+const $=id=>document.getElementById(id);let mode='offline';
 function mobileView(){const state=(mode==='pending'||mode==='waiting'||mode==='offline')?'pending':'approved';
  const stub='<script>window.REVIEW_STATE='+JSON.stringify(state)+';'+simulator+'<'+ '/script>';
  $('mobile').srcdoc=mobile.replace('</head>',stub+'</head>');}
-function render(){const v=views[mode==='complete'?'approved':mode];$('heading').textContent=v.title;$('detail').textContent=v.detail;$('action').textContent=v.action;
+function render(){$('stop').disabled=mode==='offline';const v=views[mode==='complete'?'approved':mode];$('heading').textContent=v.title;$('detail').textContent=v.detail;$('action').textContent=v.action;
  $('transfer').textContent=v.transfer;$('progress').value=v.progress;$('amount').textContent=v.amount||'File hoàn tất sẽ xuất hiện ở đây.';
  $('approval').hidden=mode!=='pending';$('qrText').textContent=v.show_qr?'QR xem trước':v.title;$('qrHint').textContent=v.show_qr?'Không dùng để kết nối':(mode==='receiving'?'Đang nhận từ điện thoại':'');
  const done=mode==='complete';$('receivedTitle').textContent=done?'Đã nhận · 1 file':'Đã nhận · 0 file';$('empty').hidden=done;
  $('receivedRows').replaceChildren();if(done){const tr=document.createElement('tr');for(const text of ['Anh-chuyen-di.jpg','10.0 MiB']){const td=document.createElement('td');td.textContent=text;tr.append(td);}$('receivedRows').append(tr);$('amount').textContent='Đã lưu Anh-chuyen-di.jpg · 10.0 MiB';}
  mobileView();}
 $('scenario').onchange=()=>{mode=$('scenario').value;render();};$('allow').onclick=()=>{mode='approved';$('scenario').value=mode;render();};
+$('stop').onclick=()=>{mode='offline';$('scenario').value=mode;render();};
 $('deny').onclick=$('action').onclick=()=>{mode='waiting';$('scenario').value=mode;render();};
 $('small').onclick=()=>$('pc').classList.toggle('small');$('settings').onclick=()=>$('settingsPanel').hidden=false;
-$('cancelSettings').onclick=()=>$('settingsPanel').hidden=true;$('applySettings').onclick=()=>{if($('dangerous').checked&&!confirm('Minh họa xác nhận: cho phép file nguy hiểm?'))return;$('settingsPanel').hidden=true;mode='waiting';$('scenario').value=mode;render();};
+$('cancelSettings').onclick=()=>$('settingsPanel').hidden=true;$('applySettings').onclick=()=>{if($('dangerous').checked&&!confirm('Minh họa xác nhận: cho phép file nguy hiểm?'))return;$('settingsPanel').hidden=true;if(mode!=='offline')mode='waiting';$('scenario').value=mode;render();};
 $('openFolder').onclick=()=>$('notice').textContent='Bản xem trước không mở thư mục. Ứng dụng thật mở thư mục nhận trên PC.';
-$('resetMobile').onclick=mobileView;render();
+$('resetMobile').onclick=mobileView;$('scenario').value=mode;render();
 </script></body></html>'''
 
 def script_json(value):

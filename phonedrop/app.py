@@ -151,6 +151,7 @@ def smoke_test(output: Path):
     from tls_support import create_tls_context
     import tempfile
     from urllib.request import Request, urlopen
+    from unittest.mock import patch
 
     def click_named(parent, name):
         for widget in parent.winfo_children():
@@ -166,6 +167,14 @@ def smoke_test(output: Path):
         state = State(Path(directory) / 'received')
         root = tk.Tk()
         ui = PhoneDropApp(root, state, MOBILE_HTML, autostart=False)
+        assert ui.server is None and not state.enabled and not state.token
+        ui.ip = '192.168.1.2'
+        ui.open_settings()
+        root.update()
+        assert click_named(ui.settings, 'Áp dụng')
+        assert ui.server is None and not state.enabled
+        state.enabled = True
+        state.rotate()
         server = PhoneDropServer(('127.0.0.1', 0), state, MOBILE_HTML, allow_loopback=True)
         worker = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .05}, daemon=True)
         worker.start()
@@ -179,6 +188,13 @@ def smoke_test(output: Path):
             root.update()
             assert ui.settings is not None
             assert click_named(ui.settings, 'Hủy')
+            token = state.token
+            for _ in range(12):
+                with urlopen(server.origin + '/', timeout=5) as response:
+                    assert response.status == 200
+            assert state.token == token and state.session is None and not state.failures
+            ui.copy_link()
+            assert root.clipboard_get() == server.origin + '/?t=' + token
             with urlopen(server.origin + '/?t=' + state.token, timeout=5) as response:
                 assert response.status == 200
             ui.refresh()
@@ -209,11 +225,34 @@ def smoke_test(output: Path):
             assert ui.canvas.bbox('all')[3] > ui.canvas.winfo_height()
             ui.connection_action()
             assert state.session is None
+            revoked = state.token
+            session = state.join(revoked, '127.0.0.1', 'smoke')
+            state.set_state(session.sid, 'approved')
+            unfinished = state.begin_upload(session.sid, '127.0.0.1', 'unfinished.txt', total=10)
+            state.write_upload(unfinished, b'a')
+            ui.stop_button.invoke()
+            root.update()
+            assert ui.server is None and not state.enabled and not state.token
+            assert not unfinished.part.exists() and (state.folder / 'smoke.txt').exists()
+            assert server.fileno() == -1 and not worker.is_alive()
+            assert str(ui.copy_button['state']) == 'disabled'
+            # Only the address restriction is adapted for the CI loopback host.
+            def loopback_server(address, *args, **kwargs):
+                return PhoneDropServer(address, *args, allow_loopback=True, **kwargs)
+            ui.ip = '127.0.0.1'
+            with patch('desktop.discover_lan_ips', return_value=['127.0.0.1']), \
+                 patch('desktop.lan_ipv4', return_value=True), \
+                 patch('desktop.PhoneDropServer', side_effect=loopback_server):
+                ui.action.invoke()
+            assert ui.server is not None and state.enabled and state.token != revoked
+            with urlopen(ui.server.origin + '/', timeout=5) as response:
+                assert response.status == 200
         finally:
             ui.close()
     output.write_text(json.dumps({'ok': True, 'version': APP_VERSION, 'python': sys.version.split()[0],
                                   'tk': True, 'qr': True, 'tls': bool(fingerprint),
-                                  'desktop_ui': True, 'http_upload': True}), encoding='utf-8')
+                                  'desktop_ui': True, 'http_upload': True,
+                                  'receive_toggle': True, 'connection_page': True}), encoding='utf-8')
 
 
 def main():

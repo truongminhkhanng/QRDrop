@@ -66,7 +66,7 @@ def test_rotation_resets_progress_and_action(tmp_path):
         assert view['state']=='waiting' and view['action']=='Tạo QR mới' and view['show_qr']
         assert snapshot['upload'] is None and not upload.part.exists()
         assert state.events.get_nowait() == ('cancelled','x.txt')
-        assert dashboard(snapshot,connected=False)['action']=='Kết nối lại'
+        assert dashboard(snapshot,connected=False)['action']=='Bật nhận file'
     finally:
         state.close()
 

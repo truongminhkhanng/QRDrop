@@ -1,3 +1,12 @@
+# PhoneDrop 1.0.2 — kiểm chứng ngày 2026-10-12
+
+- Local: 144 Python pass, 3 test socket không chạy được do sandbox EPERM; 11 JavaScript pass; compileall và kiểm tra cú pháp mobile pass.
+- Bổ sung regression mở IP:cổng 20 lần không tiêu thụ QR/khóa thiết bị; giữ Host/Origin và quyền duyệt upload.
+- EXE smoke được mở rộng: mặc định tắt; Cài đặt không tự bật; sao chép URL; truy cập trang kiểm tra 12 lần; tắt khi có file dở, đóng listener, giữ file hoàn tất; bật lại với QR mới và HTTP thật. CI hiện chờ chạy trước khi phát hành.
+- Chưa xác định nguyên nhân URL không mở trên thiết bị của người dùng; đã hỏi loại mạng và lỗi trình duyệt. Không có nghiệm thu điện thoại thật, Firewall, DPI hoặc truyền nhiều GB.
+
+Bằng chứng lịch sử bên dưới chỉ áp dụng cho source ghi trong từng lần chạy.
+
 # Bằng chứng kiểm chứng PhoneDrop — 2026-10-10
 
 ## Trạng thái hiện tại

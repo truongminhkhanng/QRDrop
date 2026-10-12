@@ -593,3 +593,23 @@ def test_monotonic_deadlines_ignore_system_wall_clock(state, monkeypatch):
     state.clock.advance(SESSION_SECONDS)
     with pytest.raises(RequestError):
         state.authorize(sid, '127.0.0.1')
+
+
+def test_connection_page_does_not_consume_token_or_lock_sender(state):
+    token = state.token
+    for _ in range(20):
+        code, headers, body = request_memory(state, 'GET', '/')
+        assert code == 200 and headers['Cache-Control'] == 'no-store'
+        assert token.encode() not in body
+    assert not state.failures and state.token == token and state.session is None
+    assert request_memory(state, 'GET', '/?t=' + token)[0] == 200
+    sid = state.session.sid
+    assert request_memory(state, 'GET', '/')[0] == 200
+    assert state.session.sid == sid
+    assert request_memory(state, 'POST', '/upload', upload_headers(sid), b'test')[0] == 403
+
+
+def test_connection_page_preserves_host_and_origin_guards(state):
+    assert request_memory(state, 'GET', '/', host='evil.example')[0] == 403
+    assert request_memory(state, 'GET', '/', {'Origin': 'https://evil.example'})[0] == 403
+    assert request_memory(state, 'GET', '/?t=invalid')[0] == 403

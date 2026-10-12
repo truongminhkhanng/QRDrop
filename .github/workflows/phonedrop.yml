@@ -66,7 +66,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw 'Packaged smoke test failed' }
           if (-not (Test-Path $resultPath)) { throw 'Missing smoke test result' }
           $result = Get-Content $resultPath -Raw | ConvertFrom-Json
-          if (-not ($result.ok -and $result.tk -and $result.qr -and $result.tls -and $result.desktop_ui -and $result.http_upload)) {
+          if (-not ($result.ok -and $result.tk -and $result.qr -and $result.tls -and $result.desktop_ui -and $result.http_upload -and $result.receive_toggle -and $result.connection_page)) {
             throw 'Incomplete packaged smoke test'
           }
           $exe = Get-Item 'dist/PhoneDrop.exe'
@@ -127,7 +127,7 @@ jobs:
           assert data[:2] == b'MZ' and 5 * 1024**2 <= len(data) <= 250 * 1024**2
           assert digest == expected
           assert result.get('version') == os.environ['PHONE_DROP_RELEASE_VERSION']
-          assert all(result.get(key) is True for key in ('ok', 'tk', 'qr', 'tls', 'desktop_ui', 'http_upload'))
+          assert all(result.get(key) is True for key in ('ok', 'tk', 'qr', 'tls', 'desktop_ui', 'http_upload', 'receive_toggle', 'connection_page'))
           print(f'PhoneDrop.exe: {len(data)} bytes; SHA-256 {digest}')
           print(json.dumps(result))
       - uses: softprops/action-gh-release@v2
@@ -146,7 +146,7 @@ jobs:
 
             Thay đổi của phiên bản này: https://github.com/${{ github.repository }}/blob/${{ github.sha }}/phonedrop/CHANGELOG.md
 
-            Tải PhoneDrop.exe, mở trên máy tính, quét QR bằng điện thoại cùng mạng Wi-Fi/LAN và bấm Cho phép trên PC. Không cần cài Python. Máy tính dùng Ethernet vẫn được nếu điện thoại truy cập được cùng mạng nội bộ.
+            Tải PhoneDrop.exe, mở trên máy tính, bấm Bật nhận file, quét QR bằng điện thoại cùng mạng Wi-Fi/LAN và bấm Cho phép trên PC. Không cần cài Python. Máy tính dùng Ethernet vẫn được nếu điện thoại truy cập được cùng mạng nội bộ.
 
             - Giao diện tiếng Việt, nền tối; chọn nhiều file, xem tiến trình và kết quả từng file.
             - Phiên nhận tối đa 12 giờ; bấm Ngắt kết nối bất cứ lúc nào. File hoàn tất được giữ lại, file dở bị hủy.

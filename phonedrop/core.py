@@ -507,6 +507,18 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.scheme or parsed.netloc or parsed.fragment:
                 raise RequestError(404, 'Không tìm thấy.')
             if method == 'GET' and parsed.path == '/':
+                if not parsed.query:
+                    self.reply(200, '<!doctype html><html lang="vi"><meta charset="utf-8">'
+                               '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                               '<title>PhoneDrop — Kiểm tra kết nối</title>'
+                               '<h1>Đã truy cập được PhoneDrop</h1>'
+                               '<p>Trình duyệt này đã kết nối được với máy tính.</p>'
+                               '<p>Để gửi file, quét QR hiện tại hoặc dùng nút Sao chép liên kết '
+                               'trong ứng dụng, rồi chờ máy tính cho phép.</p>'
+                               '<p>Nếu chỉ mở được trên PC: kiểm tra điện thoại cùng mạng Wi-Fi/LAN, '
+                               'IP trong Cài đặt, VPN, mạng khách và quyền PhoneDrop trong Windows Firewall '
+                               'cho mạng riêng. Máy tính cắm Ethernet vẫn dùng được.</p></html>', html=True)
+                    return
                 if len(parsed.query) > 256:
                     raise RequestError(400, 'Yêu cầu không hợp lệ.')
                 query = parse_qs(parsed.query, keep_blank_values=True, max_num_fields=4)

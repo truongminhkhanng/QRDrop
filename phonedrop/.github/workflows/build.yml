@@ -57,7 +57,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw 'Packaged smoke test failed' }
           if (-not (Test-Path $resultPath)) { throw 'Missing smoke test result' }
           $result = Get-Content $resultPath -Raw | ConvertFrom-Json
-          if (-not ($result.ok -and $result.tk -and $result.qr -and $result.tls -and $result.desktop_ui -and $result.http_upload)) {
+          if (-not ($result.ok -and $result.tk -and $result.qr -and $result.tls -and $result.desktop_ui -and $result.http_upload -and $result.receive_toggle -and $result.connection_page)) {
             throw 'Incomplete packaged smoke test'
           }
           $exe = Get-Item 'dist/PhoneDrop.exe'

@@ -1,5 +1,14 @@
 # PhoneDrop — Lịch sử phiên bản
 
+## 1.0.2 — 2026-10-12
+
+- Thêm Bật nhận file / Tắt nhận file; mặc định tắt khi khởi động. Tắt đóng kết nối, thu hồi QR/phiên và hủy file dở; giữ file hoàn tất.
+- Mở IP:cổng không có mã QR sẽ hiện trang kiểm tra kết nối, không tiêu thụ QR hoặc tính lỗi mã khiến thiết bị bị khóa tạm.
+- Hiển thị địa chỉ đang dùng, sao chép liên kết đầy đủ, kiểm tra trên PC và trợ giúp Wi-Fi/Ethernet/Firewall.
+- Làm mới danh sách IP khi bật nhận hoặc mở Cài đặt. Áp dụng cài đặt khi đang tắt không tự bật nhận.
+
+Kiểm tra trên PC không chứng minh điện thoại truy cập được. Bản này vẫn dùng LAN; không thêm truyền qua 4G/5G khác mạng.
+
 ## 1.0.1 — 2026-10-10
 
 - Hiển thị phiên bản trên thanh tiêu đề cửa sổ PC để nhận biết bản đang chạy.

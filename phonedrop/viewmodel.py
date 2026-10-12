@@ -30,8 +30,8 @@ def initial_geometry(screen_width: int, screen_height: int) -> tuple[int, int]:
 
 def dashboard(snapshot: dict, *, connected: bool) -> dict:
     """No credentials in the returned presentation model."""
-    result = {'title': 'Chưa kết nối mạng', 'detail': 'Mở Cài đặt để kiểm tra kết nối Wi-Fi hoặc Ethernet.',
-              'action': 'Kết nối lại', 'state': 'offline', 'progress': 0,
+    result = {'title': 'Đã tắt nhận file', 'detail': 'Bấm Bật nhận file để tạo liên kết và mã QR.',
+              'action': 'Bật nhận file', 'state': 'offline', 'progress': 0,
               'transfer': 'Chưa có file đang gửi', 'amount': '', 'show_qr': False}
     if not connected:
         return result

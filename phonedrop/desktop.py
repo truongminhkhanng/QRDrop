@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import tkinter as tk
+import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
 from PIL import ImageTk
@@ -36,6 +37,7 @@ class PhoneDropApp:
         self.addresses = discover_lan_ips() if autostart else []
         self.ip = self.addresses[0] if self.addresses else ''
         self.https = False
+        self.state.close()
         self._style()
         root.title(f'PhoneDrop {APP_VERSION}')
         width, height = initial_geometry(root.winfo_screenwidth(), root.winfo_screenheight())
@@ -45,8 +47,6 @@ class PhoneDropApp:
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.bind('<Control-comma>', lambda event: self.open_settings())
         self._build()
-        if autostart:
-            self.start_server()
         self.refresh()
 
     def _style(self):
@@ -128,6 +128,15 @@ class PhoneDropApp:
         self.connection_detail.pack(fill='x', pady=(0, 12))
         self.action = ttk.Button(card, text='Tạo QR mới', command=self.connection_action)
         self.action.pack(fill='x')
+        self.stop_button = ttk.Button(card, text='Tắt nhận file', command=self.disable_receiving, style='Danger.TButton')
+        self.stop_button.pack(fill='x', pady=(8, 0))
+        self.address_text = tk.StringVar(value='')
+        ttk.Entry(card, textvariable=self.address_text, state='readonly').pack(fill='x', pady=(12, 4))
+        self.copy_button = ttk.Button(card, text='Sao chép liên kết', command=self.copy_link)
+        self.copy_button.pack(fill='x', pady=(4, 0))
+        self.check_button = ttk.Button(card, text='Kiểm tra trên PC', command=self.check_connection)
+        self.check_button.pack(fill='x', pady=(8, 0))
+        ttk.Button(card, text='Trợ giúp kết nối', command=self.connection_help).pack(fill='x', pady=(8, 0))
         self.cert_button = ttk.Button(card, text='Đối chiếu chứng chỉ HTTPS', command=self.show_certificate)
 
         self.receive_card = ttk.Frame(self.body, style='Card.TFrame', padding=18)
@@ -223,6 +232,9 @@ class PhoneDropApp:
 
     def start_server(self):
         self.stop_server()
+        self.addresses = discover_lan_ips()
+        if not self.ip and self.addresses:
+            self.ip = self.addresses[0]
         if not lan_ipv4(self.ip):
             self.notice.configure(text='Không tìm thấy mạng nội bộ. Kết nối Wi-Fi/Ethernet rồi mở Cài đặt.')
             return
@@ -238,9 +250,44 @@ class PhoneDropApp:
             self.worker = threading.Thread(target=self.server.serve_forever, kwargs={'poll_interval': .1}, daemon=True)
             self.worker.start()
             self.notice.configure(text='Quét QR bằng camera điện thoại trên cùng mạng nội bộ.')
-        except Exception:
+        except Exception as error:
             self.stop_server()
-            self.notice.configure(text='Không thể mở kết nối. Kiểm tra IP và Firewall trong Cài đặt.')
+            code = getattr(error, 'winerror', None) or getattr(error, 'errno', None)
+            detail = f' (mã lỗi {code})' if isinstance(code, int) else ''
+            self.notice.configure(text=f'Không thể mở kết nối{detail}. Chọn lại IP trong Cài đặt và kiểm tra Firewall.')
+
+    def disable_receiving(self):
+        self.stop_server()
+        self.notice.configure(text='Đã tắt nhận file. Phiên cũ bị thu hồi; file hoàn tất được giữ lại.')
+        self.refresh()
+
+    def copy_link(self):
+        snapshot = self.state.snapshot()
+        if self.server is None or snapshot['session'] is not None or not snapshot['token']:
+            return
+        self.root.clipboard_clear()
+        self.root.clipboard_append(self.server.origin + '/?t=' + snapshot['token'])
+        self.notice.configure(text='Đã sao chép liên kết. Mở trên điện thoại cùng mạng trước khi QR hết hạn.')
+
+    def check_connection(self):
+        if self.server is None:
+            return
+        try:
+            opened = webbrowser.open(self.server.origin + '/')
+        except webbrowser.Error:
+            opened = False
+        self.notice.configure(text=('Đang mở trang kiểm tra trên PC. Kết quả này chưa xác nhận điện thoại truy cập được.'
+                                    if opened else 'Không mở được trình duyệt. Sao chép địa chỉ IP:cổng phía trên để kiểm tra.'))
+
+    def connection_help(self):
+        messagebox.showinfo('Trợ giúp kết nối',
+            '1. Bật nhận file và dùng QR hoặc liên kết mới nhất.\n\n'
+            '2. Điện thoại dùng Wi-Fi cùng mạng với PC; PC dùng dây Ethernet vẫn được. '
+            'Bản này chưa hỗ trợ 4G/5G khác mạng.\n\n'
+            '3. Trong Cài đặt, chọn IP Wi-Fi/Ethernet của PC. Kiểm tra VPN và Wi-Fi khách/cách ly thiết bị.\n\n'
+            '4. Bấm Kiểm tra trên PC. Nếu PC mở được nhưng điện thoại không mở được, '
+            'kiểm tra quyền PhoneDrop trong Windows Firewall cho mạng riêng. Không cần tắt toàn bộ Firewall.\n\n'
+            '5. Nếu dùng HTTPS tự ký, đối chiếu chứng chỉ trước khi gửi.', parent=self.root)
 
     def connection_action(self):
         if self.server is None:
@@ -251,6 +298,7 @@ class PhoneDropApp:
             self.state.rotate()
             self.dismiss_dialog()
             self.notice.configure(text='Đã đổi QR và thu hồi phiên cũ. File hoàn tất được giữ lại.')
+        self.refresh()
 
     def open_folder(self):
         try:
@@ -274,6 +322,7 @@ class PhoneDropApp:
         if self.settings is not None:
             self.settings.lift()
             return
+        self.addresses = discover_lan_ips()
         dialog = self.settings = self._dialog_window('Cài đặt PhoneDrop')
         dialog.columnconfigure(0, weight=1)
         dialog.rowconfigure(0, weight=1)
@@ -325,7 +374,7 @@ class PhoneDropApp:
         ttk.Checkbutton(form, text='Cho phép file thực thi - NGUY HIỂM', variable=dangerous).grid(row=11, column=0, sticky='w')
         ttk.Label(form, text='Mặc định chặn file thực thi. File khác vẫn có thể chứa nội dung gây hại; chỉ nhận từ người bạn tin cậy.',
                   wraplength=440, style='Muted.TLabel').grid(row=12, column=0, sticky='ew')
-        ttk.Label(form, text='Áp dụng sẽ ngắt phiên hiện tại và tạo QR mới. File đang nhận chưa xong sẽ bị hủy.',
+        ttk.Label(form, text='Áp dụng sẽ ngắt phiên hiện tại. Nếu đang bật nhận, QR mới được tạo; nếu đang tắt, nhận file vẫn tắt.',
                   wraplength=440, style='Safety.TLabel').grid(row=13, column=0, sticky='ew', pady=(20, 4))
         def dismiss():
             dialog.destroy()
@@ -358,7 +407,12 @@ class PhoneDropApp:
                 return
             self.ip, self.https = new_ip, https.get()
             dismiss()
-            self.start_server()
+            if self.server is not None:
+                self.start_server()
+            else:
+                self.state.close()
+                self.notice.configure(text='Đã lưu cài đặt. Bấm Bật nhận file khi sẵn sàng.')
+            self.refresh()
         buttons = ttk.Frame(dialog, padding=12)
         buttons.grid(row=1, column=0, columnspan=2, sticky='ew')
         ttk.Button(buttons, text='Hủy', command=dismiss).pack(side='left')
@@ -454,6 +508,10 @@ class PhoneDropApp:
         self.heading.configure(text=view['title'])
         self.connection_detail.configure(text=view['detail'])
         self.action.configure(text=view['action'], style='Danger.TButton' if snapshot['session'] else 'TButton')
+        self.stop_button.configure(state='normal' if self.server else 'disabled')
+        self.check_button.configure(state='normal' if self.server else 'disabled')
+        self.copy_button.configure(state='normal' if view['show_qr'] else 'disabled')
+        self.address_text.set(self.server.origin if self.server else 'Chưa bật nhận file')
         self.folder_label.configure(text=str(self.state.folder))
         if view['show_qr']:
             if snapshot['token'] != self.qr_token:
@@ -467,7 +525,7 @@ class PhoneDropApp:
         else:
             self.qr_token = None
             # All displayed states remain Vietnamese; no executable data appears in the QR area.
-            text = {'offline':'Kết nối Wi-Fi\nhoặc Ethernet', 'pending':'Xác nhận thiết bị\ntrên máy tính',
+            text = {'offline':'Nhận file đang tắt', 'pending':'Xác nhận thiết bị\ntrên máy tính',
                     'approved':'Đã cho phép\ngửi file', 'receiving':'Đang nhận\ntừ điện thoại'}[view['state']]
             self.qr_label.configure(image='', text=text)
         session = snapshot['session']
